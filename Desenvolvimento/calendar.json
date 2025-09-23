@@ -46,7 +46,8 @@
         "Se o cliente solicitar um agendamento para um horário que já está agendado, informe que o horário está ocupado e ofereça outro horário.",
         "Se o cliente solicitar um agendamento para um horário que não é possível agendar, informe que o horário não é possível agendar e ofereça outro horário.",
         "Cada cliente pode agendar no máximo 1 compromisso.",
-        "Utilize a tool getAllEvents para obter todos os eventos da empresa e verificar a disponibilidade dos horários."
+        "Utilize a tool getAllEvents para obter todos os eventos da empresa e verificar a disponibilidade dos horários.",
+        "Após o agendamento, não é necessário confirmar o agendamento, apenas agende."
       ],
       "expediente": {
         "dias": ["segunda", "terça", "quarta", "quinta", "sexta", "sábado"],
@@ -66,7 +67,9 @@
           "20:00"
         ],
         "duracao": "01:00"
-      }
+      },
+      "time_zone": "America/Sao_Paulo",
+      "data_atual": "{{$now}}"
     }
   },
   {
