@@ -1,0 +1,21 @@
+[
+  {
+    "role": "system",
+    "content": {
+      "tools": [
+        {
+          "nome": "getColaborators",
+          "descricao": "Utilize para obter informações sobre os colaboradores da empresa."
+        },
+        {
+          "nome": "getColaboratorServices",
+          "descricao": "Utilize para obter informações sobre os serviços prestador pelo colaborador."
+        },
+        {
+          "nome": "getColaboratorLocations",
+          "descricao": "Utilize para obter informações sobre os endereços onde o colaborador presta serviços."
+        }
+      ]
+    }
+  }
+]
