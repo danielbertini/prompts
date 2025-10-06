@@ -1,0 +1,1335 @@
+{
+  "name": "Desenvolvimento",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "desenvolvimento",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-3920, -560],
+      "id": "caadfdad-22f3-4cdf-a66c-7fc56019d9e0",
+      "name": "webhook",
+      "webhookId": "6497a1cb-d249-46ec-9c2b-b6b8129e7d0b"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('webhook').item.json.body.data.key.remoteJid }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-3504, -560],
+      "id": "03f5394f-2221-467d-97ba-fb078a83dc12",
+      "name": "getCustomerData",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2e62b9d2-c670-4abe-9f5d-80f124bc648b",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-3280, -560],
+      "id": "2734a2d8-fc0c-43ab-8705-68beb73c8003",
+      "name": "checkIfCustomerExist"
+    },
+    {
+      "parameters": {
+        "tableId": "customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('webhook').item.json.body.data.key.remoteJid }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('webhook').item.json.body.data.pushName }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-3056, -464],
+      "id": "a5157ab5-ede6-4284-ade5-3630f574d3c1",
+      "name": "createCustomer",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_message",
+              "fieldValue": "={{ $('webhook').item.json.body.date_time }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-2608, -560],
+      "id": "4c1fda69-d72d-4637-9f8c-f7068b7c96ad",
+      "name": "updateLastCustomerMessage",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-2192, -560],
+      "id": "6d84370b-6776-47ad-ac4f-f6a5f89f6d1d",
+      "name": "wait1",
+      "webhookId": "946fc202-0682-4dd6-a98c-4542723694c3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-2816, -560],
+      "id": "b389d9a7-f573-4252-af1d-87dca13a428e",
+      "name": "mergeData"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "customer_messages",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "keyName": "isBuffer",
+              "condition": "is",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-1984, -560],
+      "id": "9bea9818-1465-4987-8d25-8ab3f4f38d44",
+      "name": "getBufferMessages",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customer_messages",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "isBuffer",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "isBuffer",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-1776, -560],
+      "id": "0878d51d-0116-4225-87a8-8d96d0a7bd46",
+      "name": "cleanMessageBuffer",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "customer_memories",
+        "limit": 20,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-1568, -560],
+      "id": "3f96e64f-97bc-4f26-abb8-098a28c0e26d",
+      "name": "getCustomerMemories",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('webhook').item.json.body.instance }}",
+        "remoteJid": "={{ $('webhook').item.json.body.data.key.remoteJid }}",
+        "messageText": "={{ $json.message }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [256, -560],
+      "id": "66cdd359-5cf2-46ef-b1a3-4ed35d8366c4",
+      "name": "sendMessage",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "customerMemories",
+        "include": "specifiedFields",
+        "fieldsToInclude": "memory, created_at",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [-1152, -656],
+      "id": "c9c4c53a-ae4b-43cb-9a81-db3a6bce9b57",
+      "name": "aggregateMemory",
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3408cf9a-412f-4a73-9d04-15a05f008a7d",
+              "leftValue": "={{ $('getCustomerMemories').first().json.isNotEmpty() }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-1360, -560],
+      "id": "3b582bf3-3399-4167-9cf8-fceb9304584d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "companies",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "f53b8a68-5dfb-4d87-9aec-277a9e774104"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-3712, -560],
+      "id": "d32f3e59-df62-4770-be5f-b8ca397bb530",
+      "name": "getCompanyData",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "customer_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $('webhook').item.json.body.data.message.conversation }}"
+            },
+            {
+              "fieldId": "isBuffer",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('webhook').item.json.body.data.key.remoteJid }}"
+            },
+            {
+              "fieldId": "from",
+              "fieldValue": "human"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-2400, -560],
+      "id": "c0ece593-e1a6-48b5-a9ef-2c58d3dda80c",
+      "name": "saveHumanMessage",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "customer_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json.output }}"
+            },
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('mergeData').item.json.session_id }}"
+            },
+            {
+              "fieldId": "from",
+              "fieldValue": "agent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [48, -560],
+      "id": "53e9e958-6f9d-49b7-a06f-9e959939bb2f",
+      "name": "saveAgentMessage",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3408cf9a-412f-4a73-9d04-15a05f008a7d",
+              "leftValue": "={{ $('getCustomerMessages').first().json.isNotEmpty() }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-736, -560],
+      "id": "49154e83-f747-483a-ae56-bc62a2f0df10",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "customer_messages",
+        "limit": 20,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-944, -560],
+      "id": "239c4e22-974f-4129-aca8-2c87d8b87c87",
+      "name": "getCustomerMessages",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "customerMessages",
+        "include": "specifiedFields",
+        "fieldsToInclude": "message, from, created_at",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [-528, -656],
+      "id": "e859f7fc-a839-463b-ae45-986af192e895",
+      "name": "aggregateMessages",
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('getBufferMessages').all()\n  .filter(i => i.json?.message && i.json?.created_at)\n  .sort((a, b) => new Date(a.json.created_at) - new Date(b.json.created_at))\n  .map(i => i.json.message)\n  .join('\\n')\n}}",
+        "options": {
+          "systemMessage": "=# OBJETIVO\n\nVocê é Sofia, recepcionista da {{ $('getCompanyData').item.json.name }}. Faça acolhimento inicial, colete dados obrigatórios do cliente de forma natural e prepare-o para agentes especialistas.\n\n## PRINCÍPIO FUNDAMENTAL\n\n**VOCÊ NÃO SABE O QUE ESTÁ DISPONÍVEL ATÉ CONSULTAR AS TOOLS.**\n\n- Não há dados pré-carregados na sua memória\n- Não assuma nada baseado em nomes ou contexto\n- SEMPRE consulte as tools antes de responder sobre disponibilidade\n- Se a tool retornar dados, esses dados SÃO a verdade absoluta\n- NUNCA contradiga o que as tools retornaram\n\n## PERSONALIDADE\n\nSimpática, acolhedora, profissional e bem-humorada. Faça o cliente se sentir bem-vindo e importante.\n\n## PADRÕES DE LINGUAGEM\n\n- Use \"você\" (nunca \"senhor/senhora\" a menos que o cliente prefira)\n- Perguntas abertas: \"Como posso te ajudar?\" ao invés de \"Quer agendar?\"\n- Emojis não são permitidos\n- Evite jargões técnicos\n- Espelhe levemente o tom se o cliente usar linguagem informal\n\n---\n\n# TOOLS\n\n- **services**: serviços oferecidos pela empresa\n- **locations**: unidades da empresa\n- **customer**: dados cadastrais do cliente\n- **updateCustomer**: atualizar dados cadastrais\n- **colaborators**: colaboradores da empresa\n- **colaborators_x_locations**: unidades onde colaboradores atendem\n- **colaborators_x_services**: serviços prestados por colaborador\n- **calendar**: gerenciar eventos de agenda\n\n---\n\n# FLUXO DE ATENDIMENTO\n\n## Coleta de Dados Cadastrais\n\n1. Use **customer** para verificar dados obrigatórios\n2. Se faltar algum campo, solicite um de cada vez (máximo 3 tentativas por campo)\n3. Ao receber, use **updateCustomer** imediatamente\n4. Só continue após todos os campos obrigatórios estarem preenchidos\n\n## Atualização de Dados\n\nSe o cliente quiser atualizar algum campo existente:\n\n1. Confirme qual dado deseja atualizar\n2. Solicite o novo valor\n3. Valide o novo valor\n4. Use **updateCustomer**\n5. Confirme: \"Pronto! Atualizei seu [campo] para [novo valor]\"\n\n## Agendamentos\n\n**FLUXO OBRIGATÓRIO - SIGA EXATAMENTE NESTA ORDEM:**\n\n1. Cliente menciona interesse em serviço/agendamento, você deve executar este fluxo e ao final encontrar os relacionamentos com precisão.\n\n2. **PASSO 1 - VALIDAR SERVIÇO:**\n\n   - Chame **services** para obter lista completa\n   - Anote todos os IDs\n\n3. **PASSO 2 - BUSCAR PROFISSIONAIS:**\n\n   - Chame **colaborators** para obter lista de todos os colaboradores\n   - Anote todos os IDs\n\n4. **PASSO 3 - BUSCAR UNIDADES:**\n\n   - Chame **locations** para obter lista de todas as unidades\n   - Anote todos os IDs\n\n5. **PASSO 4 - VALIDAR QUEM FAZ O SERVIÇO E UNIDADE QUE ATENDE:**\n\n   - Chame **colaborators_x_services** e **colaborators_x_locations** para cada ID de colaborador\n   - Você receberá uma lista serviços e unidades vinculados para cada colaborador\n   - Anote todos os relacionamentos\n\n6. **PASSO 5 - APRESENTAR OPÇÕES:**\n\n   - Mostre ao cliente APENAS os colaboradores e locais relacionador\n   - Exemplo: \"Temos o [Colaborador] disponível na [Unidade] que presta o [Serviço]. Qual horário prefere?\"\n\n7. **PASSO 6 - AGENDAR:**\n   - Após o cliente escolher, chame **calendar** com o conjunto de IDs relacionados:\n     - **service_id**: UUID do serviço\n     - **colaborator_id**: UUID do colaborador\n     - **location_id**: UUID da unidade\n\n**ERROS:**\n\n- ERRO 1: Serviço existe mas nenhum colaborador presta → \"No momento não temos este serviço disponível. Posso te oferecer: [outros serviços]\"\n- ERRO 2: Colaboradores existem mas não atendem em nenhuma unidade → \"Este serviço não está disponível nas nossas unidades no momento.\"\n\n**REGRAS CRÍTICAS:**\n\n- NUNCA mencione um serviço sem ter cumprido o FLUXO OBRIGATÓRIO primeiro\n- NUNCA assuma que um serviço existe sem cumprir o FLUXO OBRIGATÓRIO\n- SEMPRE apresente apenas o que existe nas tools, não invente\n- Se cliente pedir algo que não existe, diga: \"No momento oferecemos [lista da tool services]\"\n- SEMPRE cruze os dados: se ID do colaborador está em colaborators_x_services, ele FAZ o serviço\n- SEMPRE cruze os dados: se ID co colaborador está em colaborators_x_locations, ele ATENDE na unidade\n\n## Múltiplos Agendamentos\n\nSe o cliente solicitar vários agendamentos:\n\n1. Processe um de cada vez\n2. Após confirmar o primeiro, pergunte: \"Gostaria de agendar mais algum serviço?\"\n3. Repita o processo\n\n---\n\n# CAMPOS OBRIGATÓRIOS\n\n- **name**: Nome completo (mínimo 2 palavras). Se faltar sobrenome, pergunte: \"E qual é o seu sobrenome?\"\n- **email**: Formato válido (usuario@dominio.com). Se inválido, informe gentilmente e peça novamente\n- **birthdate**: Data lógica (não futuro, maior 18 anos se necessário). Se ambígua, confirme: \"Você nasceu em DD/MM/AAAA, correto?\"\n\n---\n\n# VALIDAÇÃO DE RELACIONAMENTOS\n\nREGRAS ABSOLUTAS:\n\n- Valide TODOS os relacionamentos ANTES de oferecer opções\n- Apresente apenas combinações válidas\n- NUNCA faça o cliente escolher para depois descobrir que não é possível\n- Se não houver opção válida, informe imediatamente e sugira alternativas\n\n---\n\n# TRATAMENTO DE ERROS\n\nSe alguma tool falhar:\n\n1. NÃO exponha o erro técnico\n2. Informe: \"Aguarde um momento, estou verificando isso para você...\"\n3. Tente novamente (máximo 2 tentativas)\n4. Se persistir: \"Estou com dificuldade técnica momentânea. Pode tentar novamente em alguns instantes?\"\n\n---\n\n# REGRAS\n\n- Colete apenas campos obrigatórios, não extras\n- Nunca confie na memória, única fonte de verdade são as tools\n- NUNCA ofereça primeiro e valide depois\n- SEMPRE valide primeiro e ofereça depois\n- Não crie expectativas que não pode cumprir\n\n## Proibições Absolutas\n\nNUNCA FAÇA:\n\n- Mencionar serviços sem consultar **services** primeiro\n- Inventar variações de serviços (laser, convencional, premium, etc)\n- Criar opções múltiplas (A/B/C) sem validar todas elas antes\n- Mencionar tecnologias/equipamentos específicos não listados nas tools\n- Oferecer \"lista de espera\" sem sistema para isso\n- Assumir que algo existe baseado em nomes similares\n- Dar múltiplas alternativas hipotéticas\n- Orientar, sugerir ou opinar sobre ABSOLUTAMENTE nada\n\nSEMPRE FAÇA:\n\n- Consulte tools ANTES de falar sobre qualquer serviço\n- Apresente APENAS o que as tools retornarem\n- Se não existe, diga claramente e mostre o que existe\n- Use nomes EXATOS dos serviços conforme retornado pelas tools\n- Mantenha respostas simples e diretas baseadas em dados reais\n\n---\n\n# INFORMAÇÕES DO CLIENTE\n\nNome: {{ $('mergeData').item.json.name }}\n\n## Histórico da Conversa\n\n{{ $('getCustomerMessages').first().json.isNotEmpty() ? JSON.stringify($('aggregateMessages').item.json.customerMessages, null, 2) : 'Primeira interação' }}\n\n## Memórias\n\n{{ $('getCustomerMemories').first().json.isNotEmpty() ? JSON.stringify($('aggregateMemory').item.json.customerMemories, null, 2) : 'Nenhuma memória registrada' }}\n\n---\n\n# INFORMAÇÕES DA EMPRESA\n\n- Nome: {{ $('getCompanyData').item.json.name }}\n- Sobre: {{ $('getCompanyData').item.json.about }}\n\n---\n\n# CONTEXTO ATUAL\n\n- Data: {{ $now }}\n- Timezone: America/Sao_Paulo\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [-304, -560],
+      "id": "f8107ac4-6e30-445a-84f2-3956670dc973",
+      "name": "orchestrator",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "events",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $fromAi('event_id', 'id do evento') }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [272, 208],
+      "id": "cfc60589-33fa-4247-ab49-b80e3daf6ea7",
+      "name": "removeEvent",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "events",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS') }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('mergeData').item.json.name }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI('description', 'faça uma análise do perfil, humor e características do cliente e crie um sumário para servir de guia para o profissional ou equipe que irá atendê-lo') }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('getCompanyData').item.json.id }}"
+            },
+            {
+              "fieldId": "colaborator_id",
+              "fieldValue": "={{ $fromAI('colaborator_id', 'UUID do colaborador') }}"
+            },
+            {
+              "fieldId": "service_id",
+              "fieldValue": "={{ $fromAI('service_id', 'UUID do serviço') }}"
+            },
+            {
+              "fieldId": "location_id",
+              "fieldValue": "={{ $fromAI('location_id', 'UUID da unidade') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [-16, 208],
+      "id": "ad12bc49-f10c-45c1-bc3a-ad91146caece",
+      "name": "createEvent",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "events",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.company_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('mergeData').item.json.name }} (Remarcada)"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI('description', 'faça uma análise do perfil, humor e características do cliente e crie um sumário para servir de guia para o profissional ou equipe que irá atendê-lo') }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [128, 208],
+      "id": "1ac50792-c196-462e-a246-c4550ebb7fb6",
+      "name": "updateEvent",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "=Você é um agente especializado em gerenciar a agenda dos colaboradores, irá receber essa demanda do **orchestrator**.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "=# OBJETIVO\n\nVocê é um agente especializado em gerenciar agenda dos colaboradores. Recebe demandas do orchestrator.\n\n---\n\n# TOOLS\n\n- **getEvents**: obter eventos\n- **createEvent**: criar evento\n- **updateEvent**: atualizar evento\n- **removeEvent**: remover evento\n\n---\n\n# FLUXO DE ATENDIMENTO\n\n1. Verifique se o orchestrator forneceu todos os campos obrigatórios\n2. Se faltar algum, solicite: \"Necessário campo: [nome_do_campo]\" e aguarde\n3. Quando tiver todos os campos obrigatórios:\n4. Chame **getEvents** para verificar conflitos de data/hora\n5. Se houver conflito, sugira alternativas\n6. Se não houver conflito, confirme com o cliente: serviço, local, colaborador, data e hora\n7. Se cliente não confirmar, pergunte preferências (horário, data, profissional ou local)\n8. Se cliente confirmar, use **createEvent** para criar o evento\n9. Se data/hora já passou, informe: \"Esse horário já passou. Vamos agendar para data futura?\" e sugira próximos slots\n\n---\n\n# TRATAMENTO DE CONFLITOS\n\nAo encontrar conflito de horário:\n\n1. Identifique o horário do conflito\n2. Busque próximos 5 slots disponíveis de 1h considerando:\n   - Mesmo dia (se possível)\n   - Dias seguintes (se não houver)\n   - Horário comercial (08:00-18:00)\n   - Intervalo mínimo de 15 minutos entre eventos\n3. Se não encontrar 5 slots em 7 dias: \"A agenda está bem cheia. Posso verificar disponibilidade para próxima semana?\"\n\n---\n\n# CONFIRMAÇÃO APÓS CRIAÇÃO\n\nApós criar o evento com sucesso:\n\n1. Envie APENAS mensagem de confirmação contendo:\n\n   - Nome do serviço\n   - Profissional responsável\n   - Endereço completo\n   - Data: [dia da semana], DD de [mês] de YYYY\n   - Horário: HH:mm\n\n2. FINALIZE imediatamente após confirmar\n\n3. NUNCA pergunte, ofereça ou sugira nada além da confirmação\n\n4. Formato da mensagem:\n\n\"Agendamento confirmado!\n\nServiço: [nome do serviço]\nProfissional: [nome do profissional]\nLocal: [endereço completo]\nData: [dia da semana], [DD] de [mês] de [YYYY]\nHorário: [HH:mm]\n\nCaso precise reagendar ou cancelar, entre em contato conosco.\"\n\n5. Após enviar, retorne controle ao orchestrator\n\n---\n\n# REAGENDAMENTO E CANCELAMENTO\n\n## Reagendamento\n\n1. Use **getEvents** com customer_id para buscar evento\n2. Confirme qual evento alterar (se houver múltiplos)\n3. Siga fluxo normal de agendamento\n4. Use **updateEvent** para atualizar\n5. Confirme alteração com detalhes\n\n## Cancelamento\n\n1. Use **getEvents** para buscar evento\n2. Confirme qual cancelar\n3. Peça confirmação explícita: \"Confirma o cancelamento?\"\n4. Use **removeEvent**\n5. Confirme o cancelamento\n\n---\n\n# CAMPOS OBRIGATÓRIOS\n\n- **service_id**: UUID do serviço\n- **colaborator_id**: UUID do colaborador\n- **location_id**: UUID da unidade\n\n---\n\n# VALIDAÇÃO DE ENTRADA\n\nAntes de processar qualquer agendamento:\n\n1. Verifique se recebeu todos os campos obrigatórios\n2. Se algo faltar, retorne ao orchestrator: \"Necessário campo: [nome]\"\n3. NÃO assuma que orchestrator validou relacionamentos - faça validação básica\n4. Confie que relacionamentos entre service/colaborator/location já foram validados\n\n---\n\n# REGRAS\n\n- Duração fixa: 1h por evento\n- Horário comercial: 08:00 às 18:00\n- Dias úteis: segunda a sexta-feira\n- Intervalo entre eventos: 15 minutos\n- SEMPRE converta datas para YYYY-MM-DD HH:mm:ss antes de gravar\n- NUNCA confie na memória, sempre consulte tools\n- NUNCA agende no passado\n- NUNCA assuma confirmação, sempre aguarde resposta explícita\n\n## Padrões de Data\n\n- Confirmação: \"Segunda-feira, 15 de janeiro de 2024 às 14:00\"\n- Sugestões: \"14:00 - Segunda-feira, 15/01/2024\"\n- Banco de dados: \"2024-01-15 14:00:00\"\n\n## Confirmação de Agendamento\n\n- Confirmação é o PONTO FINAL do seu atendimento\n- NÃO inicie novas conversas após confirmar\n- NÃO faça perguntas após confirmar\n- NÃO ofereça nada além da confirmação\n- Se cliente responder após confirmação, encaminhe ao orchestrator\n\n---\n\n# CONTEXTO ATUAL\n\n- Data: {{ $now }}\n- Timezone: America/Sao_Paulo\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [-160, -112],
+      "id": "aa4d5966-03e6-45a2-930d-a3d87c5eaba6",
+      "name": "calendar"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "company_services",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [560, 208],
+      "id": "bc256fb8-87e4-434b-b17b-31c443838c1d",
+      "name": "services",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "company_locations",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [704, 208],
+      "id": "5dca87dd-4b1f-47b3-b403-bb82c00d5c80",
+      "name": "locations",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "colaborators",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [848, 208],
+      "id": "5521adad-b927-49cb-9e05-479d4eb5eadb",
+      "name": "colaborators",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [1280, 208],
+      "id": "d5058b21-218c-4694-a181-fa85ab1a837f",
+      "name": "customer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('getCompanyData').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $fromAI('name', 'nome completo do cliente') }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $fromAI('email', 'email do cliente') }}"
+            },
+            {
+              "fieldId": "birthdate",
+              "fieldValue": "={{ $fromAI('birthdate', 'data de nascimento do cliente') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [1424, 208],
+      "id": "f7fd4627-9277-4e10-8c18-7bf50f262e46",
+      "name": "updateCustomer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "colaborator_x_services",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "colaborator_id",
+              "condition": "eq",
+              "keyValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('conditions1_Field_Value', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [992, 208],
+      "id": "61a6f384-a61b-42ba-8211-d2fe1158e56b",
+      "name": "colaborators_x_services",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "colaborator_x_locations",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "colaborator_id",
+              "condition": "eq",
+              "keyValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('conditions1_Field_Value', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [1136, 208],
+      "id": "47c269e2-6f95-48d0-846d-64aca727999b",
+      "name": "colaborators_x_locations",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "events",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('mergeData').item.json.company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [416, 208],
+      "id": "ea8a7105-6078-4b53-bead-434f5cdc4490",
+      "name": "getEvents",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [-304, 208],
+      "id": "bbdbadfe-f5b1-426f-b4fe-10806c9c6c18",
+      "name": "llm",
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "webhook": {
+      "main": [
+        [
+          {
+            "node": "getCompanyData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getCustomerData": {
+      "main": [
+        [
+          {
+            "node": "checkIfCustomerExist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "checkIfCustomerExist": {
+      "main": [
+        [
+          {
+            "node": "mergeData",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "createCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "createCustomer": {
+      "main": [
+        [
+          {
+            "node": "mergeData",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "updateLastCustomerMessage": {
+      "main": [
+        [
+          {
+            "node": "saveHumanMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait1": {
+      "main": [
+        [
+          {
+            "node": "getBufferMessages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mergeData": {
+      "main": [
+        [
+          {
+            "node": "updateLastCustomerMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getBufferMessages": {
+      "main": [
+        [
+          {
+            "node": "cleanMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cleanMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "getCustomerMemories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getCustomerMemories": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregateMemory": {
+      "main": [
+        [
+          {
+            "node": "getCustomerMessages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "aggregateMemory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "getCustomerMessages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getCompanyData": {
+      "main": [
+        [
+          {
+            "node": "getCustomerData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "saveHumanMessage": {
+      "main": [
+        [
+          {
+            "node": "wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "saveAgentMessage": {
+      "main": [
+        [
+          {
+            "node": "sendMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "aggregateMessages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getCustomerMessages": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregateMessages": {
+      "main": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "orchestrator": {
+      "main": [
+        [
+          {
+            "node": "saveAgentMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "removeEvent": {
+      "ai_tool": [
+        [
+          {
+            "node": "calendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "createEvent": {
+      "ai_tool": [
+        [
+          {
+            "node": "calendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "updateEvent": {
+      "ai_tool": [
+        [
+          {
+            "node": "calendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "services": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "locations": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "colaborators": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "customer": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "updateCustomer": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "colaborators_x_services": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "colaborators_x_locations": {
+      "ai_tool": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getEvents": {
+      "ai_tool": [
+        [
+          {
+            "node": "calendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "llm": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "calendar",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "04ce4b12-5e74-4171-ab66-3134322c1252",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7817a412ad83ff0e79b10827c3866bd995411ae8fd1908af0ca05bc1bbb34d24"
+  },
+  "id": "941ItZ06ICVTHv9D",
+  "tags": []
+}
