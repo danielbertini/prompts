@@ -1,5 +1,5 @@
 // ============================================================================
-// N8N CODE NODE: Formatar contexto para prompts
+// N8N CODE NODE: Formatar contexto para prompts (VERSÃO 2 - COM DESCRIÇÕES)
 // ============================================================================
 // Este código formata os dados retornados pela function get_customer_context()
 // para serem usados nos prompts dos agentes de IA
@@ -56,9 +56,11 @@ const formattedCombinations = (context.combinations || []).map(
       id: index + 1,
       service_id: combo.service_id,
       service_name: combo.service_name,
+      service_description: combo.service_description || "Sem descrição", // ADICIONADO
       service_price: formatPrice(combo),
       colaborator_id: combo.colaborator_id,
       colaborator_name: combo.colaborator_name,
+      colaborator_description: combo.colaborator_description || "Sem descrição", // ADICIONADO
       location_id: combo.location_id,
       location_name: combo.location_name,
       location_address: formatAddress(combo.location_address),
@@ -73,6 +75,8 @@ combinationsText += "Use os IDs (UUIDs) EXATAMENTE como aparecem abaixo:\n\n";
 
 formattedCombinations.forEach((item) => {
   combinationsText += `[${item.id}] ${item.service_name} com ${item.colaborator_name} na ${item.location_name}\n`;
+  combinationsText += `    Descrição Serviço: ${item.service_description}\n`; // ADICIONADO
+  combinationsText += `    Sobre Profissional: ${item.colaborator_description}\n`; // ADICIONADO
   combinationsText += `    service_id: ${item.service_id}\n`;
   combinationsText += `    colaborator_id: ${item.colaborator_id}\n`;
   combinationsText += `    location_id: ${item.location_id}\n`;
@@ -275,35 +279,3 @@ return [
     },
   },
 ];
-
-// ============================================================================
-// COMO USAR NO PROMPT DO AGENTE
-// ============================================================================
-//
-// Substitua as variáveis antigas por:
-//
-// EMPRESA:
-//   {{ $json.company.name }}
-//   {{ $json.company.about }}
-//
-// CLIENTE:
-//   {{ $json.customer.name }}
-//   {{ $json.customer.email }}
-//   {{ $json.customerStatus }}
-//
-// HISTÓRICO:
-//   {{ $json.messageHistoryText }}
-//
-// MEMÓRIAS:
-//   {{ $json.memoriesText }}
-//
-// AGENDAMENTOS:
-//   {{ $json.eventsText }}
-//
-// OPÇÕES DISPONÍVEIS:
-//   {{ $json.combinationsText }}
-//
-// MENSAGENS DO BUFFER:
-//   {{ $json.bufferMessages }}
-//
-// ============================================================================

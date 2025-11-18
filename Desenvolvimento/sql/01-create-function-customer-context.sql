@@ -266,6 +266,7 @@ BEGIN
             'colaborator_id', comb.colaborator_id,
             'colaborator_name', comb.colaborator_name,
             'colaborator_title', comb.colaborator_title,
+            'colaborator_description', comb.colaborator_description,
             'location_id', comb.location_id,
             'location_name', comb.location_name,
             'location_address', comb.location_address,
@@ -286,7 +287,7 @@ BEGIN
             c.id as colaborator_id,
             c.name as colaborator_name,
             c.title as colaborator_title,
-            
+            c.description as colaborator_description,
             -- Localização
             l.id as location_id,
             l.name as location_name,
