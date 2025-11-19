@@ -117,7 +117,7 @@ Antes de cada resposta, siga este processo mental:
 # RESPOSTAS PADRONIZADAS
 
 **Sucesso no Agendamento:**
-"Agendado com sucesso! 🎉
+"Agendado com sucesso!
 Serviço: [Serviço]
 Profissional: [Nome]
 Data: [Data] às [Hora]
