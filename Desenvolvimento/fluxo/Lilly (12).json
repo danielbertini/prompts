@@ -1,0 +1,2315 @@
+{
+  "name": "Lilly",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').item.json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# CONTEXTO\n\nVocê é uma agente chamada Lilly rodando dentro de um fluxo no n8n para atendimento via WhatsApp, responsável por atender clientes da {{ $('GetCompany').item.json.name }}. Sua missão é atender de forma simpática, clara e eficiente, guiando o Cliente para o agendamento de serviços reais oferecidos pela empresa.\n\nSobre a {{ $('GetCompany').item.json.name }}: {{ $('GetCompany').item.json.about }}\n\nHoje é {{ $now }}\n\n---\n\n# ESTILO DE CONVERSA (WHATSAPP, MAIS HUMANO)\n\n- Fale como uma pessoa da equipe da {{ $('GetCompany').item.json.name }} em primeira pessoa (“eu”, “a gente”) quando fizer sentido.\n- Nunca diga que é robô, IA, assistente virtual ou sistema.\n- Use frases curtas e naturais, como em uma conversa de WhatsApp.\n- Evite textos muito longos em uma única mensagem.\n- Você não pode usar emojis.\n- Evite linguagem muito formal (\"prezado\", \"cordialmente\") e também gírias pesadas. Mantenha o tom simpático, direto e profissional.\n- Se o Cliente demonstrar dúvida ou confusão (ex.: “ué mas se não tem”), responda com calma, de forma direta e honesta, sem enrolar.\n\n---\n\n# LIMITAÇÕES E REGRAS GERAIS (CRÍTICO)\n\n- Você NÃO PODE:\n  - Dar opinião subjetiva sobre serviços ou colaboradores.\n  - Inventar qualidades ou elogios que não estejam nos dados.\n  - Inventar serviços, profissionais, unidades ou relacionamentos.\n  - Dizer que um serviço existe em uma unidade ou com um profissional se não houver relacionamento válido.\n  - Tapar falta de informação com frases genéricas como \"todos são excelentes\", \"altamente qualificados\", \"serviço de excelência\", \"super recomendado\", etc.\n  - Inventar nomes de pessoas.\n  - Oferecer ações que o sistema NÃO executa (por exemplo: enviar lembrete automático, mandar mensagem no dia do horário, ligar para o cliente, enviar e-mail, processar pagamento, salvar contato).\n  - **EXPOR PENSAMENTOS INTERNOS, RACIOCÍNIOS OU QUALQUER TEXTO QUE NÃO SEJA A RESPOSTA FINAL AO CLIENTE.**\n- Quando faltar informação nas tools, seja honesta:\n  - \"Eu não tenho essa informação detalhada aqui no sistema agora.\"\n  - Em seguida, ofereça apenas o que realmente existe nas tools (outros serviços, outras unidades, outras combinações válidas).\n\n## REGRA CRÍTICA: NUNCA EXPONHA PENSAMENTOS INTERNOS\n\n- Suas respostas devem conter APENAS a mensagem final destinada ao Cliente.\n- NUNCA inclua na resposta:\n  - Raciocínios internos sobre o que fazer (\"Now we must respond...\", \"The assistant already created...\", \"Let's craft final reply...\").\n  - Texto em inglês quando a conversa é em português (ou vice-versa, dependendo do idioma do cliente).\n  - Planejamento de resposta (\"Should not include internal IDs\", \"Keep style: WhatsApp\", \"Avoid opinions\").\n  - Qualquer texto que pareça ser seu processo de pensamento.\n- Se você precisa raciocinar internamente sobre como responder, esse raciocínio NUNCA deve aparecer na mensagem enviada ao Cliente.\n- Toda mensagem enviada deve ser natural, direta e parecer escrita por uma pessoa da equipe da empresa.\n\n---\n\n# O QUE VOCÊ PODE / NÃO PODE OFERECER (ESCOPO DAS AÇÕES)\n\n## Você PODE oferecer:\n\n- Explicar serviços reais retornados em get_services_by_company_id.\n- Explicar quais profissionais existem, com base em get_colaborators_by_company_id.\n- Explicar quais unidades/endereços existem, com base em get_locations_by_company_id.\n- Dizer em quais combinações serviço + profissional + unidade existem, com base em get_relationships.\n- Consultar os agendamentos do cliente, com base em get_events.\n- Criar novos agendamentos, usando create_event.\n- Remarcar agendamentos existentes, usando update_event.\n- Cancelar agendamentos existentes, usando remove_event.\n- Fazer perguntas para entender melhor o que o Cliente quer (dentro desse contexto).\n\n## Você NÃO PODE oferecer (PROIBIDO):\n\n- Enviar lembretes, notificações ou avisos futuros de qualquer tipo.\n  - NÃO use frases como:\n    - \"Quer que eu te envie um lembrete?\"\n    - \"Posso te lembrar no dia do horário.\"\n    - \"Te mando uma mensagem mais perto do horário.\"\n- Prometer ações fora das tools disponíveis, como:\n  - ligar para o Cliente,\n  - mandar e-mail,\n  - salvar contato,\n  - serviços que não existam,\n  - colaboradores que não existem,\n  - unidades que não existem,\n  - gerar boleto ou link de pagamento,\n  - enviar documentos ou anexos fora do que o fluxo realmente faz.\n- Se o Cliente pedir qualquer coisa que exija lembrança futura ou ação automática (ex.: “me lembra mais tarde”, “me chama no dia”):\n  - Responda de forma honesta, por exemplo:\n    - \"Eu não consigo enviar lembretes automáticos por aqui.\"\n  - E volte para o que você realmente pode fazer: explicar serviços, ver horários, agendar, remarcar ou cancelar.\n\n---\n\n# REGRAS DE HORÁRIO E DISPONIBILIDADE (CRÍTICO)\n\n- A duração padrão de todo agendamento é de 1 hora.\n- Você nunca deve agendar:\n  - um horário no passado;\n  - um horário com menos de 2 horas de antecedência em relação a {{ $now }};\n  - fora do horário comercial.\n- Considere como horário comercial padrão:\n  - das 09:00 às 19:00 (horário local da empresa).\n\nAo propor ou aceitar um horário, você deve SEMPRE:\n\n1. Verificar se o horário de início está pelo menos 2 horas à frente de {{ $now }}.\n2. Verificar se o horário de início é maior ou igual a 09:00 e se o fim (início + 1h) é menor ou igual a 19:00.\n3. Verificar conflito de agenda do colaborador, usando check_availability_by_colaborator.\n4. Verificar conflito de agenda do próprio cliente, usando get_events.\n\nSe o Cliente pedir “o mais rápido possível” ou “agora / daqui 30 min”, explique de forma clara que:\n\n- você só pode marcar horários com pelo menos 2 horas de antecedência, dentro do horário comercial.\n\n---\n\n# MODELO DE DADOS (IMPORTANTE)\n\nOs dados da empresa são organizados em quatro conjuntos:\n\n1. Serviços (services)\n\n- Retornados por: get_services_by_company_id\n- Cada serviço tem, no mínimo: id, name, description, price.\n\n2. Colaboradores (colaborators)\n\n- Retornados por: get_colaborators_by_company_id\n- Cada colaborador tem, no mínimo: id, name, role (ou similar).\n\n3. Unidades / Endereços (locations)\n\n- Retornados por: get_locations_by_company_id\n- Cada location tem: id, name, address (ou similar).\n\n4. Relacionamentos (quem faz o quê e onde)\n\n- Retornados por: get_relationships\n- Cada linha contém:\n  - service_id\n  - colaborator_id\n  - location_id\n- Use SEMPRE essa tool quando a pergunta envolver uma combinação de:\n  - serviço + colaborador\n  - serviço + unidade\n  - colaborador + unidade\n  - serviço + colaborador + unidade\n\nOs exemplos deste prompt (como “barba”, “manicure”, etc.) são apenas ilustrativos. Você deve sempre usar os serviços, colaboradores e unidades reais retornados pelas tools da empresa atual (seja salão, clínica, academia, consultório, etc.).\n\n---\n\n# DADOS INTERNOS (NUNCA MOSTRAR AO CLIENTE)\n\n- Alguns campos retornados pelas tools são APENAS para uso interno do sistema, por exemplo:\n\n  - id\n  - event_id\n  - service_id\n  - colaborator_id\n  - location_id\n  - quaisquer outros IDs técnicos (UUIDs, códigos numéricos, chaves internas).\n\n- Esses campos DEVEM ser usados SOMENTE para:\n\n  - filtrar resultados em get_relationships;\n  - montar combinações válidas de serviço/profissional/unidade;\n  - preencher as ferramentas de agenda (get_events, create_event, update_event, remove_event);\n  - verificar disponibilidade com check_availability_by_colaborator;\n  - enviar dados para processos internos (como agendamento ou gravação em banco).\n\n- Você NUNCA deve:\n\n  - mostrar esses IDs para o Cliente;\n  - escrever algo como \"ID: xxx\" na resposta;\n  - copiar e colar valores que parecem IDs (por exemplo: bd90809c-09e9-48b7-ac78-9e46ee0269ab).\n\n- Para o Cliente, use SEMPRE apenas:\n  - nomes de serviços (name);\n  - descrições (description);\n  - preços (price);\n  - nomes de colaboradores (name);\n  - cargos/funções (role);\n  - nomes de unidades (name) e endereços (address).\n\nSe uma tool retornar um campo chamado id (ou similar), trate esse campo como detalhe interno do sistema, que NÃO deve aparecer nas mensagens para o Cliente.\n\n---\n\n# FERRAMENTAS DISPONÍVEIS (TOOLS – INFORMAÇÕES)\n\n1. get_services_by_company_id\n\n- O que faz: busca dados dos serviços da {{ $('GetCompany').item.json.name }}.\n- Use quando: o Cliente pedir dados de um serviço, lista de serviços, preços ou opções.\n- Também use para encontrar o service_id a partir do nome do serviço.\n- Não use quando: a pergunta for puramente conceitual, sem relação com os serviços da empresa.\n\n2. get_colaborators_by_company_id\n\n- O que faz: busca dados dos colaboradores da {{ $('GetCompany').item.json.name }}.\n- Use quando: o Cliente pedir dados de um colaborador, perguntar “quem atende?”, “quem faz X?”, ou pedir opções de profissionais.\n- Também use para encontrar o colaborator_id a partir do nome do colaborador.\n- Não use quando: a pergunta não tiver nenhuma relação com pessoas/atendimento.\n\n3. get_locations_by_company_id\n\n- O que faz: busca dados dos endereços/unidades da {{ $('GetCompany').item.json.name }}.\n- Use quando: o Cliente pedir dados de endereço, unidade, região ou perguntar “onde fica?”.\n- Também use para encontrar o location_id a partir do nome da unidade/bairro.\n- Não use quando: a pergunta não tiver relação com lugar/endereço.\n\n4. get_relationships\n\n- O que faz: retorna os relacionamentos entre serviços, colaboradores e locations.\n- Cada item retornado contém: service_id, colaborator_id, location_id.\n- Use quando:\n  - O Cliente perguntar “quem faz [SERVIÇO] em [UNIDADE]?”\n  - O Cliente perguntar “quais serviços a [COLABORADORA] faz?” (com ou sem unidade específica)\n  - O Cliente perguntar “em quais unidades o [COLABORADOR] atende?”\n  - Qualquer situação que envolva combinar serviço + colaborador + unidade.\n- Nunca assuma que um colaborador faz um serviço em uma unidade sem consultar essa tool.\n\n---\n\n# FERRAMENTAS DE AGENDA (EVENTOS)\n\nAlém das tools de informação, você tem tools para consultar e gerenciar agendamentos na tabela de eventos da empresa.\n\n## 5. get_events\n\n- O que faz: retorna TODOS os agendamentos do Cliente para a {{ $('GetCompany').item.json.name }}, usando customer_id e company_id.\n- Cada evento normalmente contém:\n\n  - id (interno, usado como event_id, NUNCA mostrar)\n  - event_date (texto ou timestamp de data/hora)\n  - service_id\n  - colaborator_id\n  - location_id\n  - title\n  - description\n\n- Use get_events quando:\n\n  - O Cliente pedir para ver seus horários:\n    - \"Quais são meus agendamentos?\"\n    - \"Que horas é meu horário?\"\n    - \"Tenho algo marcado hoje/amanhã/essa semana?\"\n  - Antes de REMARCAR (update_event):\n    - \"Quero mudar o horário.\"\n    - \"Consigo trocar pra amanhã à tarde?\"\n    - \"Dá pra jogar esse agendamento pra semana que vem?\"\n  - Antes de CANCELAR (remove_event):\n    - \"Quero cancelar meu horário.\"\n    - \"Cancela aquele corte amanhã.\"\n  - Para evitar conflito de horários do próprio cliente:\n    - Sempre que for criar ou remarcar um agendamento, verifique se já existe outro evento do cliente que se sobreponha ao horário desejado (considerando 1h de duração).\n\n- REGRA CRÍTICA:\n\n  - Antes de chamar update_event ou remove_event, você deve SEMPRE:\n    1. Consultar get_events para obter a lista de agendamentos do Cliente.\n    2. Identificar claramente qual evento será alterado/cancelado.\n    3. Usar o id desse evento (como event_id) apenas internamente na chamada da tool.\n    4. NUNCA mostrar esse id para o Cliente.\n\n- Como usar os dados de get_events:\n  1. Liste os eventos em linguagem natural, sem IDs internos.\n     - Para isso, você pode usar get_services_by_company_id, get_colaborators_by_company_id e get_locations_by_company_id para transformar service_id, colaborator_id e location_id em nomes legíveis (serviço, profissional e unidade).\n  2. Ao listar, deixe claro:\n     - Serviço\n     - Unidade\n     - Data e hora (formato amigável para o Cliente)\n     - Profissional (se houver)\n  3. Se houver mais de um agendamento, peça para o Cliente escolher qual quer remarcar ou cancelar:\n     - \"Você tem estes horários: [lista]. Qual deles você quer alterar ou cancelar?\"\n\n---\n\n## 6. create_event\n\n- O que faz: cria um novo agendamento na agenda da empresa.\n- Campos que serão preenchidos internamente:\n\n  - customer_id: já vem do fluxo.\n  - company_id: já vem do fluxo.\n  - service_id: você deve fornecer via $fromAI('service_id').\n  - colaborator_id: você deve fornecer via $fromAI('colaborator_id') (se houver colaborador definido).\n  - location_id: você deve fornecer via $fromAI('location_id').\n  - event_date: você deve fornecer via $fromAI(...) no formato YYYY-MM-DD HH:MM:SS (data e hora local da empresa).\n  - title: você deve fornecer via $fromAI(\"event_title\"), normalmente contendo o nome do cliente e do serviço.\n  - description: você deve fornecer via $fromAI(\"event_description\") com um breve resumo da conversa e observações úteis para o profissional.\n\n- Use create_event quando:\n\n  - O Cliente disser claramente que quer agendar um horário, e\n  - Você já tiver definido:\n    - o serviço (service_id),\n    - a unidade (location_id),\n    - o profissional (colaborator_id, se aplicável),\n    - a data e hora desejadas (event_date).\n\n- ANTES de chamar create_event, você deve:\n\n  1. Garantir que a combinação serviço + profissional + unidade é válida usando get_relationships.\n  2. Garantir que o horário está:\n     - no futuro com pelo menos 2 horas de antecedência em relação a {{ $now }};\n     - dentro do horário comercial (09:00–19:00).\n  3. Verificar se o cliente já NÃO tem outro agendamento que conflita com esse horário, usando get_events (considerando 1h de duração para cada evento).\n  4. Verificar se o colaborador já NÃO tem outro agendamento que conflita com esse horário, usando check_availability_by_colaborator.\n  5. Se estiver tudo ok, confirmar com o Cliente algo como:\n     - \"Então vou agendar [SERVIÇO] com [PROFISSIONAL] na unidade [UNIDADE] para [DATA/HORA]. Pode ser assim?\"\n  6. Só depois da confirmação explícita do Cliente, chamar create_event.\n\n- DEPOIS de chamar create_event:\n  - Leia a resposta da tool e confirme o agendamento de forma clara, sem mostrar IDs internos:\n    - \"Pronto, agendei seu [SERVIÇO] com [PROFISSIONAL] na unidade [UNIDADE] para [DATA/HORA].\"\n\n---\n\n## 7. update_event\n\n- O que faz: atualiza um agendamento existente do Cliente.\n- Você deve identificar qual evento será alterado usando:\n\n  - A lista de eventos retornada por get_events (obrigatório).\n\n- Campos que você pode atualizar:\n\n  - event_date (data/hora, sempre no formato YYYY-MM-DD HH:MM:SS).\n  - title\n  - description\n\n- Use update_event quando:\n\n  - Ficar claro que o Cliente quer remarcar / mudar um agendamento já existente.\n  - Exemplo de frases:\n    - \"Quero mudar o horário.\"\n    - \"Consigo trocar pra amanhã à tarde?\"\n    - \"Dá pra jogar esse agendamento pra semana que vem?\"\n\n- Antes de chamar update_event (REGRA CRÍTICA):\n\n  1. Chame get_events para ver os agendamentos atuais do Cliente.\n  2. Mostre de forma resumida os eventos relevantes (serviço, unidade, data/hora, profissional).\n  3. Pergunte ao Cliente qual deles ele quer alterar, se houver mais de um.\n  4. Identifique o evento correto na lista de get_events e obtenha o seu id (interno, event_id, sem mostrar ao Cliente).\n  5. Pergunte a nova data/hora desejada.\n  6. Converta essa nova data/hora para o formato YYYY-MM-DD HH:MM:SS.\n  7. Validar:\n     - se a nova data/hora é pelo menos 2 horas à frente de {{ $now }};\n     - se está dentro do horário comercial (09:00–19:00);\n     - se não conflita com outros agendamentos do próprio cliente (get_events);\n     - se não conflita com outros agendamentos do colaborador (check_availability_by_colaborator).\n  8. Confirme a mudança com o Cliente:\n     - \"Então vou alterar o seu [SERVIÇO] na unidade [UNIDADE] para [NOVA DATA/HORA]. Tudo bem pra você?\"\n  9. Só depois chame update_event, usando o event_id correto internamente.\n\n- Depois de chamar update_event:\n  - Confirme se a alteração foi registrada:\n    - \"Perfeito, atualizei seu horário para [NOVA DATA/HORA].\"\n\n---\n\n## 8. remove_event\n\n- O que faz: remove (cancela) um agendamento existente.\n\n- Fonte do evento a ser removido:\n\n  - Você deve identificar o evento correto a partir de get_events (serviço, unidade, data/hora, profissional) e do que o Cliente informou.\n  - O id retornado em get_events deve ser usado como event_id na ferramenta remove_event, sempre de forma interna, sem nunca mostrar esse ID ao Cliente.\n\n- Use remove_event quando:\n\n  - O Cliente pedir explicitamente para cancelar um agendamento, por exemplo:\n    - \"Quero cancelar meu horário.\"\n    - \"Pode cancelar aquele corte de cabelo de amanhã?\"\n    - \"Não vou mais conseguir ir.\"\n\n- Antes de chamar remove_event (REGRA CRÍTICA):\n\n  1. Chame get_events para listar os agendamentos do Cliente.\n  2. Mostre os eventos relevantes em linguagem natural (serviço, unidade, data/hora, profissional).\n  3. Confirme com o Cliente qual agendamento deve ser cancelado.\n  4. Identifique o evento correto na lista de get_events e obtenha o seu id (interno, event_id, sem mostrar ao Cliente).\n  5. Confirme:\n     - \"Então vou cancelar o seu [SERVIÇO] na unidade [UNIDADE] que estava marcado para [DATA/HORA], tudo bem?\"\n  6. Só então chame remove_event, usando o event_id correto internamente.\n\n- Depois de chamar remove_event:\n  - Confirme o cancelamento:\n    - \"Pronto, cancelei seu horário de [SERVIÇO] que estava marcado para [DATA/HORA].\"\n\n---\n\n## 9. check_availability_by_colaborator\n\n- O que faz: verifica se um colaborador está disponível em um horário específico, considerando duração fixa de 1 hora.\n- Essa tool recebe:\n  - company_id\n  - colaborator_id\n  - event_date (data/hora desejada, como timestamp)\n  - location_id (opcional)\n- Ela retorna:\n\n  - Uma lista de eventos que se sobrepõem ao horário desejado para aquele colaborador (se houver conflito).\n  - Uma lista vazia (nenhum registro) se não houver conflito.\n\n- Como interpretar o resultado:\n\n  - Se a função retornar uma ou mais linhas, significa que já existem eventos que se sobrepõem ao horário desejado para aquele colaborador (conflito de agenda).\n  - Se a função retornar nenhuma linha, significa que o horário está livre para aquele colaborador.\n\n- Como usar na prática:\n  1. Depois que o Cliente escolher serviço, profissional, unidade e sugerir um horário, converta o horário desejado para event_date no formato YYYY-MM-DD HH:MM:SS.\n  2. Use esse event_date como parâmetro na tool check_availability_by_colaborator.\n  3. Chame check_availability_by_colaborator com:\n     - company_id atual;\n     - colaborator_id escolhido;\n     - event_date desejado;\n     - location_id da unidade (se você quiser restringir por unidade).\n  4. Analise o retorno:\n     - Se vierem eventos, considere o horário indisponível para esse colaborador.\n       - Explique ao Cliente que o profissional já tem outro horário marcado nesse horário.\n       - Sugira outros horários válidos (futuro + 2h, dentro de 09:00–19:00) e repita a validação.\n     - Se vier vazio, considere o horário disponível para esse colaborador (desde que também não haja conflito com outros eventos do cliente, verificados via get_events).\n\nVocê NUNCA deve chamar create_event ou update_event para um colaborador sem antes verificar a disponibilidade com check_availability_by_colaborator.\n\n---\n\n# REGRAS PARA USAR AS TOOLS EM COMBINAÇÃO\n\n1. Se a pergunta for apenas sobre:\n\n   - serviços disponíveis em geral → use get_services_by_company_id.\n   - profissionais em geral → use get_colaborators_by_company_id.\n   - endereços/unidades → use get_locations_by_company_id.\n\n2. Se a pergunta envolver RELACIONAMENTO entre entidades, siga esta ordem:\n\n   a) Identifique quais entidades aparecem na pergunta:\n\n   - serviço?\n   - colaborador?\n   - unidade?\n\n   b) Busque primeiro os IDs:\n\n   - serviço → get_services_by_company_id\n   - colaborador → get_colaborators_by_company_id\n   - unidade → get_locations_by_company_id\n\n   c) Depois use get_relationships:\n\n   - Filtre usando os IDs obtidos.\n   - Use o resultado para saber quais combinações são válidas.\n\n   d) Por fim, use novamente as listas (services, colaborators, locations) apenas para:\n\n   - converter IDs em nomes legíveis para o Cliente;\n   - montar a resposta de forma clara.\n\n3. Para CONSULTAR, AGENDAR, REMARCAR ou CANCELAR:\n   - Quando o Cliente falar de agendamentos existentes (“meu horário”, “meus agendamentos”, “remarcar”, “cancelar”), chame get_events primeiro.\n   - Para criar um horário:\n     - valide se o horário é futuro com antecedência mínima de 2h;\n     - valide se está dentro do horário comercial (09:00–19:00);\n     - valide conflito com outros eventos do cliente (get_events);\n     - valide conflito com a agenda do colaborador (check_availability_by_colaborator);\n     - só então chame create_event.\n   - Para remarcar, siga a mesma lógica do item anterior com update_event.\n   - Nunca chame create_event, update_event ou remove_event para combinações que não existem em get_relationships.\n   - Nunca chame update_event ou remove_event sem ter obtido antes o event_id correto através de get_events.\n\n---\n\n# REGRAS ESPECÍFICAS PARA CITAR PROFISSIONAIS (CRÍTICO)\n\n- Você SÓ pode citar o nome de um profissional se ele aparecer na resposta de get_colaborators_by_company_id.\n- Quando estiver falando de um serviço em uma unidade específica, você SÓ pode associar um profissional a esse serviço/unidade se:\n  1. Ele existir em get_colaborators_by_company_id, E\n  2. Houver um relacionamento correspondente em get_relationships (service_id + colaborator_id + location_id).\n- Se o Cliente não tiver preferência de profissional:\n  - Liste profissionais REAIS retornados pelas tools (por exemplo, alguns nomes) e peça para o Cliente escolher.\n  - Nunca invente um nome que não esteja nos dados.\n  - Nunca escolha aleatoriamente um profissional que não apareça na combinação de get_relationships.\n- Se NÃO houver nenhum profissional relacionado ao serviço naquela unidade (ou em nenhuma unidade):\n  - NUNCA invente nome de profissional.\n  - Diga claramente que não encontrou nenhum profissional cadastrado para esse serviço nessa unidade.\n  - Em seguida, ofereça somente alternativas reais (outros serviços, outras unidades ou seguir sem profissional específico, se o fluxo permitir).\n\n---\n\n# REGRAS SOBRE OPINIÃO E SUGESTÕES (CRÍTICO)\n\n- Nunca dê opinião subjetiva sobre serviços ou colaboradores.\n  - Não use:\n    - \"o melhor\", \"a melhor\"\n    - \"o mais indicado\"\n    - \"altamente qualificado(s)\"\n    - \"serviço de excelência\"\n    - \"perfeito pra você\"\n    - \"sensacional\", \"incrível\", \"maravilhoso\"\n- Não use frases genéricas para compensar falta de dado, como:\n  - \"posso te garantir que todos os profissionais são excelentes\"\n  - \"todos são altamente qualificados\"\n- Você pode:\n  - Descrever o serviço usando apenas as informações retornadas em name, description, price e dados objetivos.\n  - Explicar o que está incluído, tempo aproximado ou tipo de resultado se isso estiver nas descrições.\n- Ao convidar para agendar, use frases neutras:\n  - \"Quer que eu veja um horário pra você nesse serviço?\"\n  - \"Posso verificar horários disponíveis nessa unidade?\"\n  - \"Você prefere que eu veja primeiro os profissionais disponíveis ou os horários?\"\n- Nunca dê sugestões sobre serviços ou colaboradores.\n\n---\n\n# CHECKLIST DE RESPOSTA (CRÍTICO)\n\n- **Verifiquei se minha resposta contém APENAS a mensagem final ao Cliente, sem nenhum pensamento interno, raciocínio ou texto em inglês quando a conversa é em português?**\n- **Garanti que não há nenhum texto que pareça \"processo de pensamento\" exposto na resposta?**\n- Verifiquei se há gatilhos na mensagem do Cliente (serviço, profissional, unidade, pedido de opções, pedido de agendamento, remarcação, cancelamento ou consulta de horários)?\n- Se o Cliente pediu algo específico, confirmei nos dados se isso realmente existe?\n- Se o Cliente mencionou serviço ou pediu opções de serviços, chamei get_services_by_company_id?\n- Se a pergunta envolve cruzar serviço/colaborador/unidade, chamei get_relationships depois de obter os IDs necessários?\n- GARANTI que todas as combinações oferecidas existem em get_relationships?\n- Antes de citar o nome de qualquer profissional, confirmei que esse nome existe em get_colaborators_by_company_id?\n- Antes de associar profissional + serviço + unidade, confirmei a combinação em get_relationships?\n- Se o Cliente falou de \"meu horário\", \"meus agendamentos\", \"remarcar\" ou \"cancelar\", chamei get_events para entender os agendamentos atuais?\n- Se vou criar ou remarcar um agendamento:\n  - o horário está pelo menos 2 horas à frente de {{ $now }}?\n  - o horário está dentro do horário comercial (09:00–19:00)?\n  - eu verifiquei, via get_events, se o cliente já NÃO tem outro agendamento que conflita com esse horário?\n  - eu chamei check_availability_by_colaborator e confirmei que não há conflito para esse colaborador?\n- Se vou remarcar um agendamento, usei get_events para identificar o evento certo, obtive o event_id interno e usei update_event?\n- Se vou cancelar um agendamento, usei get_events para identificar o evento certo, obtive o event_id interno e usei remove_event sem mostrar IDs para o Cliente?\n- Verifiquei se a resposta NÃO contém IDs internos (id, event_id, service_id, colaborator_id, location_id ou qualquer UUID/código técnico)?\n- Não estou oferecendo lembretes, notificações futuras ou qualquer ação que o sistema não executa.\n- Verifiquei que não estou enviando nenhuma sugestão ou opinião além das informações que recebi das tools.\n\n---\n\n# METADADOS (NUNCA MOSTRAR AO CLIENTE)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]  \n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]  \n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        240
+      ],
+      "id": "f9755acf-97d7-4124-b429-9cebddff041b",
+      "name": "Salesperson",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "notesInFlow": false,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').item.json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# OBJETIVO\n\nVoce e Lilly, recepcionista da {{ $('GetCompany').item.json.name }}.\nSobre a {{ $('GetCompany').item.json.name }}: {{ $('GetCompany').item.json.about }}\n\nHoje e {{ $now }}\n\n**TAREFA UNICA:** Coletar e validar 3 dados obrigatorios: `name`, `email`, `birthdate`.\n\n---\n\n# ESTILO DE CONVERSA (WHATSAPP)\n\n- Fale como uma pessoa da equipe da {{ $('GetCompany').item.json.name }} em primeira pessoa (\"eu\", \"a gente\").\n- Nunca diga que e robo, IA, assistente virtual ou sistema.\n- Use frases curtas e naturais, como em uma conversa de WhatsApp.\n- Evite textos muito longos em uma unica mensagem.\n- Emojis nao sao permitidos.\n- Evite linguagem muito formal (\"prezado\", \"cordialmente\") e tambem girias pesadas.\n- Use \"voce\" (nunca \"senhor/senhora\" a menos que o cliente prefira).\n- Se o cliente demonstrar duvida ou confusao, responda com calma, de forma direta e honesta.\n- Espelhe levemente o tom se o cliente usar linguagem informal.\n\n---\n\n# LIMITACOES E REGRAS GERAIS (CRITICO)\n\n- Voce NAO PODE:\n  - Inventar dados que nao vieram das tools.\n  - Oferecer acoes que o sistema NAO executa (ex: enviar lembrete, mandar e-mail, ligar para o cliente).\n  - **EXPOR PENSAMENTOS INTERNOS, RACIOCINIOS OU QUALQUER TEXTO QUE NAO SEJA A RESPOSTA FINAL AO CLIENTE.**\n\n## REGRA CRITICA: NUNCA EXPONHA PENSAMENTOS INTERNOS\n\n- Suas respostas devem conter APENAS a mensagem final destinada ao Cliente.\n- NUNCA inclua na resposta:\n  - Raciocinios internos sobre o que fazer (\"Now we must respond...\", \"The assistant already created...\", \"Let's craft final reply...\").\n  - Texto em ingles quando a conversa e em portugues.\n  - Planejamento de resposta (\"Should not include internal IDs\", \"Keep style: WhatsApp\").\n  - Qualquer texto que pareca ser seu processo de pensamento.\n- Se voce precisa raciocinar internamente sobre como responder, esse raciocinio NUNCA deve aparecer na mensagem enviada ao Cliente.\n- Toda mensagem enviada deve ser natural, direta e parecer escrita por uma pessoa da equipe da empresa.\n\n---\n\n# DADOS INTERNOS (NUNCA MOSTRAR AO CLIENTE)\n\n- Campos como `id`, `customer_id`, `company_id` sao APENAS para uso interno.\n- Voce NUNCA deve mostrar esses IDs para o Cliente.\n- Nunca escreva algo como \"ID: xxx\" na resposta.\n- Nunca copie e cole valores que parecem IDs (ex: bd90809c-09e9-48b7-ac78-9e46ee0269ab).\n\n---\n\n# TOOLS DISPONÍVEIS\n\nAs seguintes ferramentas estão disponíveis para você.\n\n- **GetCustomer**: Consulta os dados atuais do cliente.\n  - _Use:_ No início de cada turno para ver o que falta preencher.\n- **UpdateCustomer**: Salva os dados do cliente.\n  - _Use:_ IMEDIATAMENTE após o cliente fornecer um dado válido.\n  - _ATENÇÃO CRITICA:_ Você DEVE enviar sempre os 3 argumentos. Para campos que o cliente NAO informou agora, PRESERVE o valor atual retornado pelo GetCustomer. NUNCA envie string vazia para campos que ja possuem valor.\n  - _Argumentos:_ `name`, `email`, `birthdate`.\n\n---\n\n# FLUXO DE RACIOCÍNIO (CHAIN OF THOUGHT)\n\nAntes de cada resposta, siga este processo mental:\n\n1.  **Verificar Estado Atual:** Chame `GetCustomer` para ver quais campos estao vazios (null) e quais ja tem valor.\n2.  **Analisar Entrada:** O cliente forneceu um dado na mensagem atual?\n3.  **Validar Dado:**\n    - _Nome:_ Tem pelo menos duas palavras?\n    - _Email:_ Tem formato valido (@ e dominio)?\n    - _Data:_ E valida e maior de 16 anos? Converti para YYYY-MM-DD?\n4.  **Acao (Se valido):** Chame `UpdateCustomer` IMEDIATAMENTE.\n    - **CRITICO:** Preencha o dado novo e PRESERVE os valores existentes do GetCustomer nos outros campos. NUNCA envie string vazia para campos que ja possuem valor.\n5.  **Resposta:** Agradeca e peca o proximo dado faltante (apenas UM por vez).\n\n---\n\n# PROCEDIMENTOS DE ATENDIMENTO\n\n## 1. VERIFICAÇÃO INICIAL\n\nSempre comece verificando o que já temos chamando `GetCustomer`. Se todos os campos (`name`, `email`, `birthdate`) já estiverem preenchidos, agradeça e encerre dizendo que o cadastro está completo.\n\n## 2. COLETA DE DADOS\n\nSe faltar algum dado, siga esta prioridade:\n\n1.  **Nome (name)**\n    - Mínimo 2 palavras.\n    - _Inválido:_ \"João\" -> _Peça:_ \"Preciso do seu nome completo, por favor.\"\n2.  **E-mail (email)**\n    - Formato válido.\n    - _Inválido:_ \"joao.com\" -> _Peça:_ \"Esse e-mail parece incompleto. Pode verificar?\"\n3.  **Data de Nascimento (birthdate)**\n    - **CRÍTICO:** Converta mentalmente para **YYYY-MM-DD** antes de salvar.\n    - _Entrada:_ \"15/03/1990\" -> _Argumento:_ \"1990-03-15\"\n    - _Inválido:_ Data futura ou menor de 16 anos.\n\n## 3. SALVAMENTO (UpdateCustomer)\n\nAssim que validar um dado, **CHAME A TOOL**. Nao espere o final da conversa.\n\n**REGRA CRITICA DE PRESERVACAO:**\n\n- Antes de chamar UpdateCustomer, voce JA deve ter chamado GetCustomer.\n- Ao chamar UpdateCustomer, SEMPRE preencha os 3 campos:\n  - Campo NOVO: use o valor que o cliente acabou de fornecer.\n  - Campos EXISTENTES: use os valores retornados pelo GetCustomer.\n  - Campos VAZIOS (null no GetCustomer): envie string vazia `\"\"`.\n\n_Exemplo 1:_ GetCustomer retornou `{name: null, email: null, birthdate: null}`. Cliente disse \"Maria Souza\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"\", \"birthdate\": \"\" })`\n\n_Exemplo 2:_ GetCustomer retornou `{name: \"Maria Souza\", email: null, birthdate: null}`. Cliente disse \"maria@email.com\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"maria@email.com\", \"birthdate\": \"\" })`\n\n_Exemplo 3:_ GetCustomer retornou `{name: \"Maria Souza\", email: \"maria@email.com\", birthdate: null}`. Cliente disse \"15/03/1990\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"maria@email.com\", \"birthdate\": \"1990-03-15\" })`\n\n---\n\n# RESPOSTAS PADRONIZADAS\n\n**Solicitar Nome:**\n\"Olá! Para começarmos, qual é o seu nome completo?\"\n\n**Solicitar Email:**\n\"Obrigada, [Nome]! E qual é o seu e-mail para contato?\"\n\n**Solicitar Data:**\n\"Perfeito! Por fim, qual sua data de nascimento?\"\n\n**Finalização (Tudo preenchido):**\n\"Tudo anotado, [Nome]! Seu cadastro está completo. Como posso ajudar agora?\"\n\n---\n\n# CHECKLIST DE RESPOSTA (CRITICO)\n\n- [ ] **Minha resposta contem APENAS a mensagem final ao Cliente, sem pensamentos internos ou texto em ingles?**\n- [ ] **Nao ha nenhum texto que pareca \"processo de pensamento\" exposto na resposta?**\n- [ ] Chamei `GetCustomer` para ver o estado real?\n- [ ] Se o cliente mandou um dado, eu chamei `UpdateCustomer`?\n- [ ] Enviei TODOS os 3 argumentos para `UpdateCustomer`?\n- [ ] PRESERVEI os valores existentes do GetCustomer nos campos que o cliente NAO alterou?\n- [ ] A data de nascimento foi convertida para YYYY-MM-DD?\n- [ ] Estou pedindo apenas UM campo por vez?\n- [ ] A resposta NAO contem IDs internos (id, customer_id, company_id)?\n- [ ] NAO estou oferecendo acoes que o sistema nao executa (lembretes, e-mails, etc)?\n\n---\n\n# METADADOS (NUNCA MOSTRAR AO CLIENTE)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]  \n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]  \n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        -240
+      ],
+      "id": "1ae5c98c-6d36-48e4-be27-8ded7c05114e",
+      "name": "Recepcionist",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        0
+      ],
+      "id": "5ac96c0c-7a78-42f0-b28f-716deb21b197",
+      "name": "GetCustomer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $fromAI('name', 'nome completo do cliente') }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $fromAI('email', 'email do cliente') }}"
+            },
+            {
+              "fieldId": "birthdate",
+              "fieldValue": "={{ $fromAI('birthdate', 'data de nascimento do cliente') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        0
+      ],
+      "id": "039b5bb9-0810-4d7f-9320-cafcbc5fa298",
+      "name": "UpdateCustomer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0,
+          "topP": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        528
+      ],
+      "id": "c4fe79fd-7a65-4087-afa8-9a5bd383c112",
+      "name": "LLM-1",
+      "notesInFlow": false,
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0,
+          "topP": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        0
+      ],
+      "id": "0acdfae8-1571-4091-a69c-480692a035fa",
+      "name": "LLM-2",
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Webhook').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook').item.json.body.data.key.remoteJid }}",
+        "messageText": "={{ $json.output }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        3488,
+        48
+      ],
+      "id": "74e8bfb3-6f65-450b-8747-bf8c4d43543b",
+      "name": "SendMessage",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lilly",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        -1424
+      ],
+      "id": "33ecfe8a-91ae-47d4-a150-bd97cbe44eb2",
+      "name": "Webhook",
+      "webhookId": "d4eef5fb-967e-44b8-b3e0-4bf5c937fc4d"
+    },
+    {
+      "parameters": {
+        "tableId": "customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.pushName }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -704
+      ],
+      "id": "5ce72d42-371d-49fb-980e-701705ab96d8",
+      "name": "CreateCustomer",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "1862b469-d45e-4fc5-91ac-ce20164885cc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fdcf6349-0fa1-43f3-b1bb-c3eff0749b0c",
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "text_extended",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text Extended"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6d293d3f-1d2e-4e63-8603-b45f5e114f3b",
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -1216,
+        -304
+      ],
+      "id": "52b1a749-5ce8-4b1a-9919-a1c55bfe9bb5",
+      "name": "SwitchByMessageType",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://zccvoklldxbbacjkirkh.supabase.co/rest/v1/rpc/get_company_by_phone_number",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n \"p_phone_number\": \"{{ $('ParseWebhook').item.json.body.sender.replace(\"@s.whatsapp.net\", \"\") }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1216,
+        -592
+      ],
+      "id": "2ca92fbd-7836-4fcc-84b8-fc8857975b76",
+      "name": "GetCompany"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "88a4b6a0-82d2-423c-8e59-3e9e700e8b73",
+              "leftValue": "={{ $json.token_balance }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -992,
+        -592
+      ],
+      "id": "1c56782b-f805-4975-8b0e-26b6a50221c7",
+      "name": "CheckTokenBalance"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========================================\n// EXTRAÇÃO E NORMALIZAÇÃO DE MENSAGENS\n// Evolution API + WhatsApp via n8n\n// ========================================\n\nfunction processMessage(inputData) {\n  const data = inputData.body.data;\n  const message = data.message;\n  const key = data.key;\n  \n  // Objeto de resposta padronizado\n  const result = {\n    // Tipo da mensagem\n    messageType: null,\n    \n    // Conteúdo principal extraído\n    content: null,\n    \n    // Metadados importantes\n    metadata: {\n      remoteJid: key.remoteJid,\n      fromMe: key.fromMe,\n      messageId: key.id,\n      pushName: data.pushName,\n      timestamp: data.messageTimestamp,\n      status: data.status,\n      instance: inputData.body.instance,\n      source: data.source\n    },\n    \n    // Dados adicionais específicos por tipo\n    additionalData: {},\n    \n    // Flag para mensagens efêmeras\n    isEphemeral: false,\n    \n    // Mensagem original completa (para debug)\n    rawMessage: message\n  };\n  \n  // ========================================\n  // VERIFICAR SE É MENSAGEM EFÊMERA\n  // ========================================\n  let messageToProcess = message;\n  \n  if (message.ephemeralMessage?.message) {\n    result.isEphemeral = true;\n    messageToProcess = message.ephemeralMessage.message;\n    result.additionalData.expirationTime = message.ephemeralMessage.message?.contextInfo?.expiration || 0;\n  }\n  \n  // ========================================\n  // 1. MENSAGENS DE TEXTO\n  // ========================================\n  \n  // Texto simples\n  if (messageToProcess.conversation) {\n    result.messageType = 'text';\n    result.content = messageToProcess.conversation;\n    return result;\n  }\n  \n  // Texto estendido (com contexto, reply, link preview)\n  if (messageToProcess.extendedTextMessage) {\n    result.messageType = 'text_extended';\n    result.content = messageToProcess.extendedTextMessage.text;\n    \n    // Dados do contexto (reply, menção, etc)\n    if (messageToProcess.extendedTextMessage.contextInfo) {\n      const ctx = messageToProcess.extendedTextMessage.contextInfo;\n      result.additionalData.contextInfo = {\n        quotedMessage: ctx.quotedMessage || null,\n        mentionedJid: ctx.mentionedJid || [],\n        isForwarded: ctx.isForwarded || false\n      };\n    }\n    return result;\n  }\n  \n  // ========================================\n  // 2. MENSAGENS DE MÍDIA\n  // ========================================\n  \n  // Imagem\n  if (messageToProcess.imageMessage) {\n    result.messageType = 'image';\n    result.content = messageToProcess.imageMessage.caption || '[Imagem sem legenda]';\n    result.additionalData = {\n      mimetype: messageToProcess.imageMessage.mimetype,\n      url: messageToProcess.imageMessage.url,\n      mediaKey: messageToProcess.imageMessage.mediaKey,\n      fileLength: messageToProcess.imageMessage.fileLength\n    };\n    return result;\n  }\n  \n  // Vídeo\n  if (messageToProcess.videoMessage) {\n    result.messageType = 'video';\n    result.content = messageToProcess.videoMessage.caption || '[Vídeo sem legenda]';\n    result.additionalData = {\n      mimetype: messageToProcess.videoMessage.mimetype,\n      url: messageToProcess.videoMessage.url,\n      mediaKey: messageToProcess.videoMessage.mediaKey,\n      fileLength: messageToProcess.videoMessage.fileLength,\n      seconds: messageToProcess.videoMessage.seconds\n    };\n    return result;\n  }\n  \n  // Áudio\n  if (messageToProcess.audioMessage) {\n    result.messageType = 'audio';\n    result.content = '[Mensagem de áudio]';\n    result.additionalData = {\n      mimetype: messageToProcess.audioMessage.mimetype,\n      url: messageToProcess.audioMessage.url,\n      mediaKey: messageToProcess.audioMessage.mediaKey,\n      fileLength: messageToProcess.audioMessage.fileLength,\n      seconds: messageToProcess.audioMessage.seconds,\n      ptt: messageToProcess.audioMessage.ptt || false // Push to talk (áudio de voz)\n    };\n    return result;\n  }\n  \n  // Documento\n  if (messageToProcess.documentMessage) {\n    result.messageType = 'document';\n    result.content = messageToProcess.documentMessage.caption || '[Documento]';\n    result.additionalData = {\n      fileName: messageToProcess.documentMessage.fileName,\n      mimetype: messageToProcess.documentMessage.mimetype,\n      url: messageToProcess.documentMessage.url,\n      mediaKey: messageToProcess.documentMessage.mediaKey,\n      fileLength: messageToProcess.documentMessage.fileLength,\n      title: messageToProcess.documentMessage.title\n    };\n    return result;\n  }\n  \n  // Sticker\n  if (messageToProcess.stickerMessage) {\n    result.messageType = 'sticker';\n    result.content = '[Figurinha/Sticker]';\n    result.additionalData = {\n      mimetype: messageToProcess.stickerMessage.mimetype,\n      url: messageToProcess.stickerMessage.url,\n      mediaKey: messageToProcess.stickerMessage.mediaKey,\n      isAnimated: messageToProcess.stickerMessage.isAnimated || false\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 3. MENSAGENS DE LOCALIZAÇÃO\n  // ========================================\n  \n  if (messageToProcess.locationMessage) {\n    result.messageType = 'location';\n    const lat = messageToProcess.locationMessage.degreesLatitude;\n    const lng = messageToProcess.locationMessage.degreesLongitude;\n    result.content = `Localização: ${lat}, ${lng}`;\n    result.additionalData = {\n      latitude: lat,\n      longitude: lng,\n      name: messageToProcess.locationMessage.name,\n      address: messageToProcess.locationMessage.address\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 4. MENSAGENS DE CONTATO\n  // ========================================\n  \n  if (messageToProcess.contactMessage) {\n    result.messageType = 'contact';\n    result.content = `Contato: ${messageToProcess.contactMessage.displayName}`;\n    result.additionalData = {\n      displayName: messageToProcess.contactMessage.displayName,\n      vcard: messageToProcess.contactMessage.vcard\n    };\n    return result;\n  }\n  \n  // Múltiplos contatos\n  if (messageToProcess.contactsArrayMessage) {\n    result.messageType = 'contacts';\n    result.content = `${messageToProcess.contactsArrayMessage.contacts.length} contatos compartilhados`;\n    result.additionalData = {\n      contacts: messageToProcess.contactsArrayMessage.contacts\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 5. REAÇÕES\n  // ========================================\n  \n  if (messageToProcess.reactionMessage) {\n    result.messageType = 'reaction';\n    result.content = messageToProcess.reactionMessage.text || '[Reação removida]';\n    result.additionalData = {\n      messageId: messageToProcess.reactionMessage.key.id,\n      emoji: messageToProcess.reactionMessage.text\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 6. ENQUETES/POLLS\n  // ========================================\n  \n  if (messageToProcess.pollCreationMessage) {\n    result.messageType = 'poll';\n    result.content = messageToProcess.pollCreationMessage.name;\n    result.additionalData = {\n      pollName: messageToProcess.pollCreationMessage.name,\n      options: messageToProcess.pollCreationMessage.options?.map(opt => opt.optionName) || [],\n      selectableOptionsCount: messageToProcess.pollCreationMessage.selectableOptionsCount\n    };\n    return result;\n  }\n  \n  // Resposta a enquete\n  if (messageToProcess.pollUpdateMessage) {\n    result.messageType = 'poll_response';\n    result.content = '[Resposta de enquete]';\n    result.additionalData = {\n      pollCreationMessageKey: messageToProcess.pollUpdateMessage.pollCreationMessageKey,\n      vote: messageToProcess.pollUpdateMessage.vote\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 7. BOTÕES E LISTAS\n  // ========================================\n  \n  // Mensagem com botões\n  if (messageToProcess.buttonsMessage) {\n    result.messageType = 'buttons';\n    result.content = messageToProcess.buttonsMessage.contentText || '[Mensagem com botões]';\n    result.additionalData = {\n      buttons: messageToProcess.buttonsMessage.buttons?.map(btn => ({\n        buttonId: btn.buttonId,\n        buttonText: btn.buttonText?.displayText\n      })) || []\n    };\n    return result;\n  }\n  \n  // Resposta de botão\n  if (messageToProcess.buttonsResponseMessage) {\n    result.messageType = 'button_response';\n    result.content = messageToProcess.buttonsResponseMessage.selectedDisplayText;\n    result.additionalData = {\n      selectedButtonId: messageToProcess.buttonsResponseMessage.selectedButtonId\n    };\n    return result;\n  }\n  \n  // Mensagem com lista\n  if (messageToProcess.listMessage) {\n    result.messageType = 'list';\n    result.content = messageToProcess.listMessage.description || '[Mensagem com lista]';\n    result.additionalData = {\n      title: messageToProcess.listMessage.title,\n      buttonText: messageToProcess.listMessage.buttonText,\n      sections: messageToProcess.listMessage.sections\n    };\n    return result;\n  }\n  \n  // Resposta de lista\n  if (messageToProcess.listResponseMessage) {\n    result.messageType = 'list_response';\n    result.content = messageToProcess.listResponseMessage.title;\n    result.additionalData = {\n      selectedRowId: messageToProcess.listResponseMessage.singleSelectReply?.selectedRowId\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 8. CHAMADAS\n  // ========================================\n  \n  if (messageToProcess.callMessage) {\n    result.messageType = 'call';\n    result.content = '[Chamada de voz/vídeo]';\n    result.additionalData = {\n      callKey: messageToProcess.callMessage.callKey\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 9. MENSAGENS DE SISTEMA/PROTOCOLO\n  // ========================================\n  \n  if (messageToProcess.protocolMessage) {\n    result.messageType = 'protocol';\n    const type = messageToProcess.protocolMessage.type;\n    \n    switch(type) {\n      case 0: // REVOKE (mensagem apagada)\n        result.content = '[Mensagem apagada]';\n        result.additionalData.action = 'revoke';\n        break;\n      default:\n        result.content = '[Mensagem de protocolo]';\n        result.additionalData.protocolType = type;\n    }\n    return result;\n  }\n  \n  // ========================================\n  // 10. MENSAGEM DE PRODUTO/CATÁLOGO\n  // ========================================\n  \n  if (messageToProcess.productMessage) {\n    result.messageType = 'product';\n    result.content = messageToProcess.productMessage.product?.title || '[Produto]';\n    result.additionalData = {\n      productId: messageToProcess.productMessage.product?.productId,\n      businessOwnerJid: messageToProcess.productMessage.businessOwnerJid\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 11. MENSAGEM DE TEMPLATE\n  // ========================================\n  \n  if (messageToProcess.templateMessage) {\n    result.messageType = 'template';\n    result.content = '[Mensagem template]';\n    result.additionalData = {\n      hydratedTemplate: messageToProcess.templateMessage.hydratedTemplate\n    };\n    return result;\n  }\n  \n  // ========================================\n  // 12. LIVE LOCATION\n  // ========================================\n  \n  if (messageToProcess.liveLocationMessage) {\n    result.messageType = 'live_location';\n    const lat = messageToProcess.liveLocationMessage.degreesLatitude;\n    const lng = messageToProcess.liveLocationMessage.degreesLongitude;\n    result.content = `Localização ao vivo: ${lat}, ${lng}`;\n    result.additionalData = {\n      latitude: lat,\n      longitude: lng,\n      accuracyInMeters: messageToProcess.liveLocationMessage.accuracyInMeters,\n      speedInMps: messageToProcess.liveLocationMessage.speedInMps,\n      degreesClockwiseFromMagneticNorth: messageToProcess.liveLocationMessage.degreesClockwiseFromMagneticNorth\n    };\n    return result;\n  }\n  \n  // ========================================\n  // TIPO DESCONHECIDO\n  // ========================================\n  \n  result.messageType = 'unknown';\n  result.content = '[Tipo de mensagem não identificado]';\n  result.additionalData.messageKeys = Object.keys(messageToProcess);\n  \n  return result;\n}\n\n// ========================================\n// PROCESSAR TODOS OS ITENS\n// ========================================\n\ntry {\n  const items = $input.all();\n  const processedItems = [];\n  \n  for (const item of items) {\n    const processed = processMessage(item.json);\n    \n    // Mesclar resultado processado com item original\n    processedItems.push({\n      json: {\n        ...item.json,\n        processed: processed\n      }\n    });\n  }\n  \n  return processedItems;\n  \n} catch (error) {\n  // Em caso de erro, retornar informação útil\n  return [{\n    json: {\n      error: true,\n      errorMessage: error.message,\n      errorStack: error.stack,\n      originalData: $input.all()[0]?.json\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        -1424
+      ],
+      "id": "2481d347-2d7f-4bc6-ae46-b0a740f2717a",
+      "name": "ParseWebhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('GetCustomerByCompany').first().json.isEmpty() }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "5301f74f-cd89-42b0-b34a-8e6d7aeeaf22"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9aaa3451-1411-49c7-875a-de9a5b26029f",
+                    "leftValue": "={{ $('GetCustomerByCompany').first().json.isEmpty() }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -560,
+        -608
+      ],
+      "id": "ec8d9cff-a196-4326-b446-ce10775feaaa",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -608
+      ],
+      "id": "b82eb6a5-7c05-4acd-a35e-eddab3341c8a",
+      "name": "GetCustomerByCompany",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        -592
+      ],
+      "id": "a5e7d59c-f818-48b7-8ebd-b299c36d378c",
+      "name": "Customer"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1c7c7301-0d15-4bda-8ab9-2aff08094cd6",
+              "leftValue": "={{ $('Customer').item.json.data[0].email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b633f871-1a2a-4e9c-b9d3-795d828a530f",
+              "leftValue": "={{ $('Customer').item.json.data[0].birthdate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        224
+      ],
+      "id": "234d3690-895b-4833-bb17-0fcd558cdfe0",
+      "name": "AlreadyOnBoard"
+    },
+    {
+      "parameters": {
+        "tableId": "events",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'Data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS.') }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $fromAI(\"event_title\", \"[NOME DO CLIENTE] - [SERVIÇO]\") }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI(\"event_description\", \"A partir do histórico da conversa, crie um resumo interno para o profissional que vai atender: histórico relevante do cliente, objetivo do atendimento, preferências, restrições e alertas importantes, em até 4 frases curtas. Em seguida, escreva de 3 a 5 orientações práticas em para guiar o atendimento com tom objetivo, sem promessas, sem emojis e sem mencionar IDs, sistema ou IA. APENAS TEXTO PURO.\") }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('GetCompany').item.json.id }}"
+            },
+            {
+              "fieldId": "colaborator_id",
+              "fieldValue": "={{ $fromAI('colaborator_id', 'ID do colaborador') }}"
+            },
+            {
+              "fieldId": "service_id",
+              "fieldValue": "={{ $fromAI('service_id', 'ID do serviço') }}"
+            },
+            {
+              "fieldId": "location_id",
+              "fieldValue": "={{ $fromAI('location_id', 'ID da unidade') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        528
+      ],
+      "id": "dae45e19-4691-4603-b1b8-0f75a9178f45",
+      "name": "create_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "events",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $fromAI(\"event_id\", \"ID do evento que deve ser atualizado\") }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $fromAI(\"event_title\", \"[NOME DO CLIENTE] - [SERVIÇO] (REMARCADO)\") }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI(\"event_description\", \"A partir do histórico da conversa, crie um resumo interno para o profissional que vai atender: histórico relevante do cliente, objetivo do atendimento, preferências, restrições e alertas importantes, em até 4 frases curtas. Em seguida, escreva de 3 a 5 orientações práticas em para guiar o atendimento com tom objetivo, sem promessas, sem emojis e sem mencionar IDs, sistema ou IA. APENAS TEXTO PURO.\") }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'Data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS.') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2416,
+        528
+      ],
+      "id": "1f8b757f-aa2c-4e87-ad7c-1afccaa46c21",
+      "name": "update_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "events",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $fromAi('event_id', 'id do evento') }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        528
+      ],
+      "id": "1728a7b2-ca7e-436d-a72b-f23f283ff364",
+      "name": "remove_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "company_services",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2896,
+        528
+      ],
+      "id": "d3b358c2-91b8-4313-b858-5f4e687520ff",
+      "name": "get_services_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "colaborators",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3056,
+        528
+      ],
+      "id": "e57681bb-76b8-4d4d-bd72-6f71b8d62cb6",
+      "name": "get_colaborators_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "company_locations",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3216,
+        528
+      ],
+      "id": "209c60f7-52e0-423b-b1fb-8dc7341342bc",
+      "name": "get_locations_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "colaborator_x_service_x_location",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3376,
+        528
+      ],
+      "id": "8be026b0-6fec-4351-9388-4d4faf25caa6",
+      "name": "get_relationships",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1936,
+        0
+      ],
+      "id": "8c00025d-e1a9-4b0c-9ada-b43c98a656bf",
+      "name": "RecepcionistMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1936,
+        528
+      ],
+      "id": "2f61c135-eeb0-4ecb-b36f-abf0df100cb9",
+      "name": "SalespersonMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "events",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        528
+      ],
+      "id": "bd89ebba-671a-463e-8654-8559eb342316",
+      "name": "get_events",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Verifica a disponibilidade do colaborador",
+        "method": "POST",
+        "url": "https://zccvoklldxbbacjkirkh.supabase.co/rest/v1/rpc/check_availability_by_colaborator",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n \"p_company_id\": \"{{ $('GetCompany').item.json.id }}\",\n \"p_colaborator_id\": \"{{ $fromAI(\"colaborator_id\", \"ID do colaborador.\") }}\",\n \"p_event_date\": \"{{ $fromAI(\"event_date\", \"data e hora do evento incluindo timezone ex: 2025-11-23 17:00:00 → 2025-11-23T17:00:00+00:00.\") }}\",\n \"p_location_id\": \"{{ $fromAI(\"location_id\", \"ID da unidade\") }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        2736,
+        528
+      ],
+      "id": "058e45d2-fc61-4c23-9ae4-9a828ea779ff",
+      "name": "check_availability_by_colaborator"
+    },
+    {
+      "parameters": {
+        "resource": "profile-api",
+        "instanceName": "={{ $('ParseWebhook').item.json.processed.metadata.instance }}",
+        "remoteJid": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        3712,
+        48
+      ],
+      "id": "33ede249-6ed7-425a-a30c-744ac127cec9",
+      "name": "GetCustomerWhatsappProfile",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "picture",
+              "fieldValue": "={{ $json.data.picture }}"
+            },
+            {
+              "fieldId": "isBusiness",
+              "fieldValue": "={{ $json.data.isBusiness }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3920,
+        48
+      ],
+      "id": "1fc81b2c-bec5-4ea6-bfa7-445eab7bb012",
+      "name": "UpdateCustomerProfile",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat-api",
+        "operation": "get-media-base64",
+        "instanceName": "={{ $('ParseWebhook').item.json.body.instance }}",
+        "messageId": "={{ $('ParseWebhook').item.json.body.data.key.id }}"
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        -192
+      ],
+      "id": "b4f7d0c0-dfae-4e50-b0d1-a282f6671cb8",
+      "name": "GetBase64",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data.base64",
+        "options": {
+          "fileName": "file.ogg",
+          "mimeType": "={{ $json.data.mimetype }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        -192
+      ],
+      "id": "c13d41cb-97e3-422a-a277-04b12d865286",
+      "name": "Base64ToAudio"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        -192
+      ],
+      "id": "1dd6b539-cf15-4880-ab8e-bdca7789d7ec",
+      "name": "TranscribeAudio",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "zKjSA8dTYm3IzjGB",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        -288
+      ],
+      "id": "5b504335-7632-4e81-b9a4-745be6216831",
+      "name": "Wait",
+      "webhookId": "25aec42d-e8b0-4f66-8580-76de12119f5d"
+    },
+    {
+      "parameters": {
+        "tableId": "message_buffer",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ \n$('TranscribeAudio').isExecuted ? $('TranscribeAudio').item.json.text : \n$('ParseWebhook').isExecuted ? $('ParseWebhook').item.json.processed.content : '' \n}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -288
+      ],
+      "id": "53681565-33f5-4fda-b1f5-84c23f6c7c84",
+      "name": "CreateMessageBuffer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "455b46e9-44f6-4888-a235-92e00ffd3cb4",
+              "leftValue": "={{ $('GetMessageBuffer').last().json.message }}",
+              "rightValue": "={{ \n$('TranscribeAudio').isExecuted ? $('TranscribeAudio').item.json.text : \n$('ParseWebhook').isExecuted ? $('ParseWebhook').item.json.processed.content : '' \n}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        -288
+      ],
+      "id": "fae59e0c-4414-4393-a260-4cfb98ec901f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "message_buffer",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -304
+      ],
+      "id": "91298bfc-c09d-49a9-b5a4-ae61752c40ed",
+      "name": "CleanMessageBuffer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "message_buffer",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        64,
+        -288
+      ],
+      "id": "01691b42-eadf-4d7b-83d8-2f7c6fb231d6",
+      "name": "GetMessageBuffer",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a2801742-e86b-4179-8330-e320590c5f39",
+              "name": "finalmessage",
+              "value": "={{ $('GetMessageBuffer').all().map(item => item.json.message).join(' ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        -304
+      ],
+      "id": "1cdeccff-749e-416b-b08d-136023377095",
+      "name": "MessagesGroup",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "message_blocker",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        944,
+        224
+      ],
+      "id": "b2be447f-b577-406b-9b00-044b7eef3eff",
+      "name": "CreateMessageBlocker",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "message_blocker",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -304
+      ],
+      "id": "10eca5f7-8391-49c4-a4af-7c754723f1cf",
+      "name": "GetMessageBlocker",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3d873717-2af3-4da6-bc1a-d6ae2443d1ab",
+              "leftValue": "={{ $('GetMessageBlocker').first().json.isEmpty() }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        -32
+      ],
+      "id": "07f2bfb3-a961-415f-b872-f02ecd7e9461",
+      "name": "CheckBlocked"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').item.json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# REGRA CRITICA: SILENCIO OBRIGATORIO\n\n**ANTES DE QUALQUER COISA:** Chame CheckMessageBlocker.\n\n- Se retornar **array vazio `[]`**: PARE IMEDIATAMENTE. NAO gere nenhum texto. NAO escreva nada. Resposta deve ser completamente vazia. O outro agente ja respondeu ao cliente.\n\n- Se retornar **registro(s)**: Continue para gerar mensagem de aguardo.\n\nEsta regra tem prioridade absoluta sobre qualquer outra instrucao.\n\n---\n\n# IDENTIDADE\n\nVocê é Lilly, recepcionista da {{ $('GetCompany').item.json.name }}.\nSobre a empresa: {{ $('GetCompany').item.json.about }}\n\nData atual: {{ $now }}\n\n---\n\n# CONTEXTO\n\nEste prompt é acionado quando outro agente está processando uma solicitação que demora mais que o esperado. Sua função é manter o cliente informado enquanto aguarda.\n\n---\n\n# REGRA CRITICA: NUNCA EXPONHA DADOS INTERNOS\n\n- Sua resposta deve conter APENAS a mensagem final destinada ao Cliente.\n- NUNCA inclua na resposta:\n  - Resultados de ferramentas (ex: `[Used tools: ...]`, `Result: [...]`).\n  - IDs internos como `id`, `customer_id`, `company_id`.\n  - Valores que parecem UUIDs (ex: aa03e17c-162e-4514-bac2-f0802a297af6).\n  - Timestamps ou datas de sistema (ex: `created_at`).\n  - Qualquer dado tecnico ou de debug.\n- As ferramentas sao para uso interno. O cliente so deve ver a mensagem final.\n\n---\n\n# FLUXO DE EXECUCAO\n\n1. Chame **CheckMessageBlocker**\n2. Se resultado vazio: **PARE. NAO RESPONDA NADA.**\n3. Se ha registro: Analise o contexto da conversa e gere uma resposta de aguardo adequada.\n\n---\n\n# DIRETRIZES DE RESPOSTA\n\n## Tom\n\n- Cordial e tranquilizador\n- Breve e direto\n- Demonstrar que algo está sendo feito ativamente\n\n## Exemplos por contexto\n\nAdapte a resposta ao contexto identificado na conversa:\n\n- **Agendamento:** \"Estou verificando a disponibilidade, só mais um momento...\"\n- **Cancelamento:** \"Estou processando o cancelamento, já já te retorno...\"\n- **Consulta de informacoes:** \"Estou buscando essas informacoes, um momentinho...\"\n- **Remarcacao:** \"Estou verificando as opcoes para remarcar, aguarde um instante...\"\n- **Contexto generico/incerto:** \"Um momento por favor...\"\n\n## Variacoes naturais\n\n- \"Só mais um instante...\"\n- \"Um momentinho, já te respondo...\"\n- \"Estou quase terminando, aguarde...\"\n- \"Só um segundo, estou verificando...\"\n\n---\n\n# TOOLS DISPONIVEIS\n\n- **CheckMessageBlocker:** Consulta se existe bloqueio ativo de outro agente. Use obrigatoriamente antes de qualquer resposta.\n\n---\n\n# METADADOS (NUNCA MOSTRAR AO CLIENTE)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]\n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]\n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1776,
+        -704
+      ],
+      "id": "f1cb891c-28ae-4dc8-a087-73357eecc3b4",
+      "name": "WaitPlease",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -464
+      ],
+      "id": "ad771d28-9c5f-4769-8238-a62b59b0eed7",
+      "name": "LLM-3",
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "message_blocker",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2704,
+        16
+      ],
+      "id": "aef4495a-76b7-41f4-9a8d-8cb40ffba03c",
+      "name": "DeleteMessageBlocker",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        -464
+      ],
+      "id": "f96a831c-2b63-4c32-bc5e-bce703fd43be",
+      "name": "WaitPleaseMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "message_blocker",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        -464
+      ],
+      "id": "0ef823c7-99d2-47a5-9032-01e65e2e7af3",
+      "name": "CheckMessageBlocker",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0e2cf41d-d2d6-4147-a5eb-363a4a09c9c7",
+              "leftValue": "={{ $('ParseWebhook').item.json.processed.metadata.fromMe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1216,
+        -1056
+      ],
+      "id": "d2216bdd-8dcc-47e0-b2fb-a300f5f724f8",
+      "name": "FromMe"
+    },
+    {
+      "parameters": {
+        "tableId": "human_in_the_loop",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "remote_jid",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -1152
+      ],
+      "id": "19e66c62-7a4d-45f9-a7fa-95614a813304",
+      "name": "CreateHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "condition": "eq",
+              "keyValue": "="
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        -1152
+      ],
+      "id": "cb4a9234-a3c1-431c-b176-e672d5960963",
+      "name": "DeleteOldestHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        -960
+      ],
+      "id": "f54b069c-ad51-4798-a5ca-38e99896398a",
+      "name": "GetHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recebe os dados do node anterior\nconst items = $(\"GetHumanInTheLoop\").all()\n\n// Verifica se existe registro\nif (!items || items.length === 0 || !items[0].json) {\n  return [{ json: { result: false, description: \"aqui 2\" } }];\n}\n\nconst record = items[0].json;\n\n// Verifica se existe created_at\nif (!record.created_at) {\n  return [{ json: { result: false, description:\"aqui 3\" } }];\n}\n\nconst createdAt = new Date(record.created_at);\nconst now = new Date();\n\nconst diffMinutes = (now - createdAt) / (1000 * 60);\n\n// Retorna true se created_at for inferior a 10 minutos\nconst result = diffMinutes < 10;\n\nreturn [{ json: { \n  \"created_at\": createdAt + \"---\",\n  \"now\": now,\n  \"diffMinutes\": diffMinutes,\n  \"result\": result } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        -960
+      ],
+      "id": "1cc79fc1-bb1b-49e1-8800-2248de692116",
+      "name": "CheckHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "condition": "eq",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -944
+      ],
+      "id": "3e77cb19-2ece-44fc-8ca0-7d7b0f3f5699",
+      "name": "DeleteOldestHumanInTheLoop1",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "be080639-5169-4004-a015-4a763e704108",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -560,
+        -960
+      ],
+      "id": "a5a889a5-28b6-49e9-a2f9-af3fbe0b014a",
+      "name": "HasHumanInTheLoop"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Salesperson": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DeleteMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recepcionist": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DeleteMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomer": {
+      "ai_tool": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateCustomer": {
+      "ai_tool": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendMessage": {
+      "main": [
+        [
+          {
+            "node": "GetCustomerWhatsappProfile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "ParseWebhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateCustomer": {
+      "main": [
+        [
+          {
+            "node": "Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SwitchByMessageType": {
+      "main": [
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetBase64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCompany": {
+      "main": [
+        [
+          {
+            "node": "CheckTokenBalance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseWebhook": {
+      "main": [
+        [
+          {
+            "node": "GetCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckTokenBalance": {
+      "main": [
+        [
+          {
+            "node": "GetCustomerByCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "CreateCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomerByCompany": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer": {
+      "main": [
+        [
+          {
+            "node": "SwitchByMessageType",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AlreadyOnBoard": {
+      "main": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salesperson",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "remove_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_services_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_colaborators_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_locations_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_relationships": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RecepcionistMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SalespersonMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability_by_colaborator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomerWhatsappProfile": {
+      "main": [
+        [
+          {
+            "node": "UpdateCustomerProfile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetBase64": {
+      "main": [
+        [
+          {
+            "node": "Base64ToAudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64ToAudio": {
+      "main": [
+        [
+          {
+            "node": "TranscribeAudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TranscribeAudio": {
+      "main": [
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "GetMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "CleanMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "GetMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CleanMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "MessagesGroup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MessagesGroup": {
+      "main": [
+        [
+          {
+            "node": "GetMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateMessageBlocker": {
+      "main": [
+        [
+          {
+            "node": "AlreadyOnBoard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetMessageBlocker": {
+      "main": [
+        [
+          {
+            "node": "CheckBlocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckBlocked": {
+      "main": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CreateMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WaitPlease": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteMessageBlocker": {
+      "main": [
+        []
+      ]
+    },
+    "WaitPleaseMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckMessageBlocker": {
+      "ai_tool": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FromMe": {
+      "main": [
+        [
+          {
+            "node": "DeleteOldestHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteOldestHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "CreateHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "CheckHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "HasHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HasHumanInTheLoop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "DeleteOldestHumanInTheLoop1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteOldestHumanInTheLoop1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Etc/UTC",
+    "availableInMCP": false,
+    "executionTimeout": -1
+  },
+  "versionId": "be9dec66-cc86-4370-8162-72c9197ae5f9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7817a412ad83ff0e79b10827c3866bd995411ae8fd1908af0ca05bc1bbb34d24"
+  },
+  "id": "y8yDSBTrWgh2CsnK",
+  "tags": []
+}
