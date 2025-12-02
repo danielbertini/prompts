@@ -282,7 +282,7 @@ Além das tools de informação, você tem tools para consultar e gerenciar agen
   - colaborator_id: você deve fornecer via $fromAI('colaborator_id') (se houver colaborador definido).
   - location_id: você deve fornecer via $fromAI('location_id').
   - event_date: você deve fornecer via $fromAI(...) no formato YYYY-MM-DD HH:MM:SS (data e hora local da empresa).
-  - title: você deve fornecer via $fromAI("event_title"), normalmente algo como "[NOME DO CLIENTE] - [SERVIÇO]".
+  - title: você deve fornecer via $fromAI("event_title"), normalmente contendo o nome do cliente e do serviço.
   - description: você deve fornecer via $fromAI("event_description") com um breve resumo da conversa e observações úteis para o profissional.
 
 - Use create_event quando:
