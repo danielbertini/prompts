@@ -88,8 +88,7 @@ SELECT
   event_date,
   service_id,
   colaborator_id,
-  location_id,
-  title
+  location_id
 FROM events;
 
 COMMENT ON VIEW v_events_minimal IS 'View otimizada de eventos para reducao de tokens nas tools de IA';

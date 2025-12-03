@@ -48,9 +48,13 @@ Data/hora atual: {{ $now }}
 - `get_events`: agendamentos do cliente, conflitos, obter event_id
 - `check_availability_by_colaborator`: verificar disponibilidade do profissional
 
+## Regra: `send_typing`
+
+SEMPRE chame `send_typing` em PARALELO com a primeira tool de qualquer fluxo. Nao aguarde retorno.
+
 ## Fluxo: Agendar (`create_event`)
 
-1. Valide combinacao em `get_relationships`
+1. Chame `send_typing` + `get_relationships` em paralelo
 2. Valide horario (futuro +2h, dentro de 09-19h)
 3. Verifique conflitos do CLIENTE via `get_events`
 4. Verifique conflitos do PROFISSIONAL via `check_availability_by_colaborator`
@@ -60,7 +64,7 @@ Data/hora atual: {{ $now }}
 
 ## Fluxo: Remarcar (`update_event`)
 
-1. Chame `get_events` para listar agendamentos
+1. Chame `send_typing` + `get_events` em paralelo
 2. Mostre ao cliente em linguagem natural (use as tools de info para converter IDs em nomes)
 3. Peca para escolher qual alterar (se houver mais de um)
 4. Obtenha o `event_id` internamente (nunca mostre)
@@ -70,7 +74,7 @@ Data/hora atual: {{ $now }}
 
 ## Fluxo: Cancelar (`remove_event`)
 
-1. Chame `get_events` para listar agendamentos
+1. Chame `send_typing` + `get_events` em paralelo
 2. Mostre ao cliente em linguagem natural
 3. Confirme qual cancelar
 4. Obtenha o `event_id` internamente (nunca mostre)
