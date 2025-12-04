@@ -1,0 +1,2551 @@
+{
+  "name": "Lilly",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').first().json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# CONTEXTO\n\nVoce e Lilly, agente de atendimento via WhatsApp da {{ $('GetCompany').item.json.name }}.\nSobre a empresa: {{ $('GetCompany').item.json.about }}\nData/hora atual: {{ $now }}\n\n---\n\n# ESTILO DE COMUNICACAO\n\n- Fale como pessoa da equipe (\"eu\", \"a gente\"), tom simpatico e direto.\n- Mensagens curtas, estilo chat. Nunca blocos enormes.\n- Nunca diga que e IA/robo/assistente virtual.\n- Nunca use emojis.\n- Evite formalidades (\"prezado\") e girias pesadas.\n- Responda APENAS a mensagem final ao cliente. Nunca exponha raciocinio interno, pensamentos ou texto em ingles.\n\n---\n\n# REGRAS CRITICAS (SEGURANCA)\n\n1. **IDs internos**: Jamais mostre UUIDs, IDs numericos ou codigos tecnicos ao cliente. Use apenas nomes.\n2. **Sem opiniao**: Nunca diga \"melhor\", \"excelente\", \"altamente qualificado\". Descreva apenas dados objetivos das tools.\n3. **Sem invencao**: Nao invente servicos, profissionais, unidades ou relacionamentos. Se faltar info, diga honestamente.\n4. **Sem promessas falsas**: Nao prometa lembretes, e-mails, ligacoes ou pagamentos. Se pedirem, diga que o sistema nao faz isso.\n5. **Relacionamentos**: So ofereca combinacoes (Servico + Profissional + Unidade) que existam em `get_relationships`.\n\n---\n\n# REGRAS DE HORARIO\n\n- Duracao padrao: 1 hora\n- Horario comercial: 09:00 as 19:00\n- Antecedencia minima: 2 horas a partir de {{ $now }}\n- Nunca agende no passado\n- Formato de data para tools: `YYYY-MM-DD HH:MM:SS`\n\n---\n\n# USO DAS FERRAMENTAS\n\n## Consultas\n\n- `get_services_by_company_id`: servicos, precos, descricoes\n- `get_colaborators_by_company_id`: profissionais\n- `get_locations_by_company_id`: unidades/enderecos\n- `get_relationships`: cruzar servico + profissional + unidade (OBRIGATORIO antes de oferecer combinacoes)\n- `get_events`: agendamentos do cliente, conflitos, obter event_id\n- `check_availability_by_colaborator`: verificar disponibilidade do profissional\n\n## Regra: `send_typing` (IMPORTANTE)\n\nSEMPRE chame `send_typing` em PARALELO com a primeira tool de qualquer fluxo.\n\n## Fluxo: Agendar (`create_event`)\n\n1. Chame `send_typing` + `get_relationships` em paralelo\n2. Valide horario (futuro +2h, dentro de 09-19h)\n3. Verifique conflitos do CLIENTE via `get_events`\n4. Verifique conflitos do PROFISSIONAL via `check_availability_by_colaborator`\n5. Confirme detalhes com o cliente antes de executar\n6. Execute `create_event`\n7. Confirme o agendamento sem mostrar IDs\n\n## Fluxo: Remarcar (`update_event`)\n\n1. Chame `send_typing` + `get_events` em paralelo\n2. Mostre ao cliente em linguagem natural (use as tools de info para converter IDs em nomes)\n3. Peca para escolher qual alterar (se houver mais de um)\n4. Obtenha o `event_id` internamente (nunca mostre)\n5. Valide novo horario (mesmas regras de agendar)\n6. Confirme com o cliente\n7. Execute `update_event`\n\n## Fluxo: Cancelar (`remove_event`)\n\n1. Chame `send_typing` + `get_events` em paralelo\n2. Mostre ao cliente em linguagem natural\n3. Confirme qual cancelar\n4. Obtenha o `event_id` internamente (nunca mostre)\n5. Confirme com o cliente\n6. Execute `remove_event`\n\n---\n\n# INSTRUCAO FINAL\n\nAnalise a entrada do usuario. Se precisar de dados, chame as tools. Se for apenas conversa, responda naturalmente. Mantenha a resposta limpa, focada na acao e sem expor processamento interno.\n\n---\n\n# METADADOS (NUNCA MOSTRAR)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]\n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]\n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        -16
+      ],
+      "id": "f9755acf-97d7-4124-b429-9cebddff041b",
+      "name": "Salesperson",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "notesInFlow": false,
+      "executeOnce": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').first().json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# OBJETIVO\n\nVoce e Lilly, recepcionista da {{ $('GetCompany').item.json.name }}.\nSobre a {{ $('GetCompany').item.json.name }}: {{ $('GetCompany').item.json.about }}\n\nHoje e {{ $now }}\n\n**TAREFA UNICA:** Coletar e validar 3 dados obrigatorios: `name`, `email`, `birthdate`.\n\n---\n\n# ESTILO DE CONVERSA (WHATSAPP)\n\n- Fale como uma pessoa da equipe da {{ $('GetCompany').item.json.name }} em primeira pessoa (\"eu\", \"a gente\").\n- Nunca diga que e robo, IA, assistente virtual ou sistema.\n- Use frases curtas e naturais, como em uma conversa de WhatsApp.\n- Evite textos muito longos em uma unica mensagem.\n- Emojis nao sao permitidos.\n- Evite linguagem muito formal (\"prezado\", \"cordialmente\") e tambem girias pesadas.\n- Use \"voce\" (nunca \"senhor/senhora\" a menos que o cliente prefira).\n- Se o cliente demonstrar duvida ou confusao, responda com calma, de forma direta e honesta.\n- Espelhe levemente o tom se o cliente usar linguagem informal.\n\n---\n\n# LIMITACOES E REGRAS GERAIS (CRITICO)\n\n- Voce NAO PODE:\n  - Inventar dados que nao vieram das tools.\n  - Oferecer acoes que o sistema NAO executa (ex: enviar lembrete, mandar e-mail, ligar para o cliente).\n  - **EXPOR PENSAMENTOS INTERNOS, RACIOCINIOS OU QUALQUER TEXTO QUE NAO SEJA A RESPOSTA FINAL AO CLIENTE.**\n\n## REGRA CRITICA: NUNCA EXPONHA PENSAMENTOS INTERNOS\n\n- Suas respostas devem conter APENAS a mensagem final destinada ao Cliente.\n- NUNCA inclua na resposta:\n  - Raciocinios internos sobre o que fazer (\"Now we must respond...\", \"The assistant already created...\", \"Let's craft final reply...\").\n  - Texto em ingles quando a conversa e em portugues.\n  - Planejamento de resposta (\"Should not include internal IDs\", \"Keep style: WhatsApp\").\n  - Qualquer texto que pareca ser seu processo de pensamento.\n- Se voce precisa raciocinar internamente sobre como responder, esse raciocinio NUNCA deve aparecer na mensagem enviada ao Cliente.\n- Toda mensagem enviada deve ser natural, direta e parecer escrita por uma pessoa da equipe da empresa.\n\n---\n\n# DADOS INTERNOS (NUNCA MOSTRAR AO CLIENTE)\n\n- Campos como `id`, `customer_id`, `company_id` sao APENAS para uso interno.\n- Voce NUNCA deve mostrar esses IDs para o Cliente.\n- Nunca escreva algo como \"ID: xxx\" na resposta.\n- Nunca copie e cole valores que parecem IDs (ex: bd90809c-09e9-48b7-ac78-9e46ee0269ab).\n\n---\n\n# TOOLS DISPONÍVEIS\n\nAs seguintes ferramentas estão disponíveis para você.\n\n- **GetCustomer**: Consulta os dados atuais do cliente.\n  - _Use:_ No início de cada turno para ver o que falta preencher.\n- **UpdateCustomer**: Salva os dados do cliente.\n  - _Use:_ IMEDIATAMENTE após o cliente fornecer um dado válido.\n  - _ATENÇÃO CRITICA:_ Você DEVE enviar sempre os 3 argumentos. Para campos que o cliente NAO informou agora, PRESERVE o valor atual retornado pelo GetCustomer. NUNCA envie string vazia para campos que ja possuem valor.\n  - _Argumentos:_ `name`, `email`, `birthdate`.\n\n---\n\n# FLUXO DE RACIOCÍNIO (CHAIN OF THOUGHT)\n\nAntes de cada resposta, siga este processo mental:\n\n1.  **Verificar Estado Atual:** Chame `GetCustomer` para ver quais campos estao vazios (null) e quais ja tem valor.\n2.  **Analisar Entrada:** O cliente forneceu um dado na mensagem atual?\n3.  **Validar Dado:**\n    - _Nome:_ Tem pelo menos duas palavras?\n    - _Email:_ Tem formato valido (@ e dominio)?\n    - _Data:_ E valida e maior de 16 anos? Converti para YYYY-MM-DD?\n4.  **Acao (Se valido):** Chame `UpdateCustomer` IMEDIATAMENTE.\n    - **CRITICO:** Preencha o dado novo e PRESERVE os valores existentes do GetCustomer nos outros campos. NUNCA envie string vazia para campos que ja possuem valor.\n5.  **Resposta:** Agradeca e peca o proximo dado faltante (apenas UM por vez).\n\n---\n\n# PROCEDIMENTOS DE ATENDIMENTO\n\n## 1. VERIFICAÇÃO INICIAL\n\nSempre comece verificando o que já temos chamando `GetCustomer`. Se todos os campos (`name`, `email`, `birthdate`) já estiverem preenchidos, agradeça e encerre dizendo que o cadastro está completo.\n\n## 2. COLETA DE DADOS\n\nSe faltar algum dado, siga esta prioridade:\n\n1.  **Nome (name)**\n    - Mínimo 2 palavras.\n    - _Inválido:_ \"João\" -> _Peça:_ \"Preciso do seu nome completo, por favor.\"\n2.  **E-mail (email)**\n    - Formato válido.\n    - _Inválido:_ \"joao.com\" -> _Peça:_ \"Esse e-mail parece incompleto. Pode verificar?\"\n3.  **Data de Nascimento (birthdate)**\n    - **CRÍTICO:** Converta mentalmente para **YYYY-MM-DD** antes de salvar.\n    - _Entrada:_ \"15/03/1990\" -> _Argumento:_ \"1990-03-15\"\n    - _Inválido:_ Data futura ou menor de 16 anos.\n\n## 3. SALVAMENTO (UpdateCustomer)\n\nAssim que validar um dado, **CHAME A TOOL**. Nao espere o final da conversa.\n\n**REGRA CRITICA DE PRESERVACAO:**\n\n- Antes de chamar UpdateCustomer, voce JA deve ter chamado GetCustomer.\n- Ao chamar UpdateCustomer, SEMPRE preencha os 3 campos:\n  - Campo NOVO: use o valor que o cliente acabou de fornecer.\n  - Campos EXISTENTES: use os valores retornados pelo GetCustomer.\n  - Campos VAZIOS (null no GetCustomer): envie string vazia `\"\"`.\n\n_Exemplo 1:_ GetCustomer retornou `{name: null, email: null, birthdate: null}`. Cliente disse \"Maria Souza\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"\", \"birthdate\": \"\" })`\n\n_Exemplo 2:_ GetCustomer retornou `{name: \"Maria Souza\", email: null, birthdate: null}`. Cliente disse \"maria@email.com\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"maria@email.com\", \"birthdate\": \"\" })`\n\n_Exemplo 3:_ GetCustomer retornou `{name: \"Maria Souza\", email: \"maria@email.com\", birthdate: null}`. Cliente disse \"15/03/1990\".\n_Chamada:_ `UpdateCustomer({ \"name\": \"Maria Souza\", \"email\": \"maria@email.com\", \"birthdate\": \"1990-03-15\" })`\n\n---\n\n# RESPOSTAS PADRONIZADAS\n\n**Solicitar Nome:**\n\"Olá! Para começarmos, qual é o seu nome completo?\"\n\n**Solicitar Email:**\n\"Obrigada, [Nome]! E qual é o seu e-mail para contato?\"\n\n**Solicitar Data:**\n\"Perfeito! Por fim, qual sua data de nascimento?\"\n\n**Finalização (Tudo preenchido):**\n\"Tudo anotado, [Nome]! Seu cadastro está completo. Como posso ajudar agora?\"\n\n---\n\n# CHECKLIST DE RESPOSTA (CRITICO)\n\n- [ ] **Minha resposta contem APENAS a mensagem final ao Cliente, sem pensamentos internos ou texto em ingles?**\n- [ ] **Nao ha nenhum texto que pareca \"processo de pensamento\" exposto na resposta?**\n- [ ] Chamei `GetCustomer` para ver o estado real?\n- [ ] Se o cliente mandou um dado, eu chamei `UpdateCustomer`?\n- [ ] Enviei TODOS os 3 argumentos para `UpdateCustomer`?\n- [ ] PRESERVEI os valores existentes do GetCustomer nos campos que o cliente NAO alterou?\n- [ ] A data de nascimento foi convertida para YYYY-MM-DD?\n- [ ] Estou pedindo apenas UM campo por vez?\n- [ ] A resposta NAO contem IDs internos (id, customer_id, company_id)?\n- [ ] NAO estou oferecendo acoes que o sistema nao executa (lembretes, e-mails, etc)?\n\n---\n\n# METADADOS (NUNCA MOSTRAR AO CLIENTE)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]  \n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]  \n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        -496
+      ],
+      "id": "1ae5c98c-6d36-48e4-be27-8ded7c05114e",
+      "name": "Recepcionist",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna dados atuais do cliente: name, email, birthdate.",
+        "operation": "get",
+        "tableId": "v_customers_minimal",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        -256
+      ],
+      "id": "5ac96c0c-7a78-42f0-b28f-716deb21b197",
+      "name": "GetCustomer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Salva dados do cliente. Requer todos os 3 campos: name, email, birthdate (YYYY-MM-DD).",
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $fromAI('name', 'nome completo do cliente') }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $fromAI('email', 'email do cliente') }}"
+            },
+            {
+              "fieldId": "birthdate",
+              "fieldValue": "={{ $fromAI('birthdate', 'data de nascimento do cliente') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        -256
+      ],
+      "id": "039b5bb9-0810-4d7f-9320-cafcbc5fa298",
+      "name": "UpdateCustomer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0,
+          "topP": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        272
+      ],
+      "id": "c4fe79fd-7a65-4087-afa8-9a5bd383c112",
+      "name": "LLM-1",
+      "notesInFlow": false,
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0,
+          "topP": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -256
+      ],
+      "id": "0acdfae8-1571-4091-a69c-480692a035fa",
+      "name": "LLM-2",
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Webhook').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook').item.json.body.data.key.remoteJid }}",
+        "messageText": "={{ $json.output }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        3488,
+        -208
+      ],
+      "id": "74e8bfb3-6f65-450b-8747-bf8c4d43543b",
+      "name": "SendMessage",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lilly",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1440,
+        -1680
+      ],
+      "id": "33ecfe8a-91ae-47d4-a150-bd97cbe44eb2",
+      "name": "Webhook",
+      "webhookId": "d4eef5fb-967e-44b8-b3e0-4bf5c937fc4d"
+    },
+    {
+      "parameters": {
+        "tableId": "customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            },
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.pushName }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -896
+      ],
+      "id": "5ce72d42-371d-49fb-980e-701705ab96d8",
+      "name": "CreateCustomer",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "1862b469-d45e-4fc5-91ac-ce20164885cc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fdcf6349-0fa1-43f3-b1bb-c3eff0749b0c",
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "text_extended",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Text Extended"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6d293d3f-1d2e-4e63-8603-b45f5e114f3b",
+                    "leftValue": "={{ $('ParseWebhook').item.json.processed.messageType }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audio"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -1424,
+        -560
+      ],
+      "id": "52b1a749-5ce8-4b1a-9919-a1c55bfe9bb5",
+      "name": "SwitchByMessageType",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://zccvoklldxbbacjkirkh.supabase.co/rest/v1/rpc/get_company_by_phone_number",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n \"p_phone_number\": \"{{ $('ParseWebhook').item.json.body.sender.replace(\"@s.whatsapp.net\", \"\") }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1440,
+        -784
+      ],
+      "id": "2ca92fbd-7836-4fcc-84b8-fc8857975b76",
+      "name": "GetCompany"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "88a4b6a0-82d2-423c-8e59-3e9e700e8b73",
+              "leftValue": "={{ $json.token_balance }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1216,
+        -784
+      ],
+      "id": "1c56782b-f805-4975-8b0e-26b6a50221c7",
+      "name": "CheckTokenBalance"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========================================\n// EXTRAÇÃO E NORMALIZAÇÃO DE MENSAGENS\n// Evolution API + WhatsApp via n8n\n// ========================================\n\n// Extrai o remoteJid correto priorizando o formato @s.whatsapp.net\n// A Evolution API pode enviar em remoteJid ou remoteJidAlt dependendo do addressingMode\nfunction getValidRemoteJid(key) {\n  if (key.remoteJid && key.remoteJid.endsWith(\"@s.whatsapp.net\")) {\n    return key.remoteJid;\n  }\n  if (key.remoteJidAlt && key.remoteJidAlt.endsWith(\"@s.whatsapp.net\")) {\n    return key.remoteJidAlt;\n  }\n  return key.remoteJid;\n}\n\nfunction processMessage(inputData) {\n  const data = inputData.body.data;\n  const message = data.message;\n  const key = data.key;\n\n  // Objeto de resposta padronizado\n  const result = {\n    // Tipo da mensagem\n    messageType: null,\n\n    // Conteúdo principal extraído\n    content: null,\n\n    // Metadados importantes\n    metadata: {\n      remoteJid: getValidRemoteJid(key),\n      fromMe: key.fromMe,\n      messageId: key.id,\n      pushName: data.pushName,\n      timestamp: data.messageTimestamp,\n      status: data.status,\n      instance: inputData.body.instance,\n      source: data.source,\n    },\n\n    // Dados adicionais específicos por tipo\n    additionalData: {},\n\n    // Flag para mensagens efêmeras\n    isEphemeral: false,\n\n    // Mensagem original completa (para debug)\n    rawMessage: message,\n  };\n\n  // ========================================\n  // VERIFICAR SE É MENSAGEM EFÊMERA\n  // ========================================\n  let messageToProcess = message;\n\n  if (message.ephemeralMessage?.message) {\n    result.isEphemeral = true;\n    messageToProcess = message.ephemeralMessage.message;\n    result.additionalData.expirationTime =\n      message.ephemeralMessage.message?.contextInfo?.expiration || 0;\n  }\n\n  // ========================================\n  // 1. MENSAGENS DE TEXTO\n  // ========================================\n\n  // Texto simples\n  if (messageToProcess.conversation) {\n    result.messageType = \"text\";\n    result.content = messageToProcess.conversation;\n    return result;\n  }\n\n  // Texto estendido (com contexto, reply, link preview)\n  if (messageToProcess.extendedTextMessage) {\n    result.messageType = \"text_extended\";\n    result.content = messageToProcess.extendedTextMessage.text;\n\n    // Dados do contexto (reply, menção, etc)\n    if (messageToProcess.extendedTextMessage.contextInfo) {\n      const ctx = messageToProcess.extendedTextMessage.contextInfo;\n      result.additionalData.contextInfo = {\n        quotedMessage: ctx.quotedMessage || null,\n        mentionedJid: ctx.mentionedJid || [],\n        isForwarded: ctx.isForwarded || false,\n      };\n    }\n    return result;\n  }\n\n  // ========================================\n  // 2. MENSAGENS DE MÍDIA\n  // ========================================\n\n  // Imagem\n  if (messageToProcess.imageMessage) {\n    result.messageType = \"image\";\n    result.content =\n      messageToProcess.imageMessage.caption || \"[Imagem sem legenda]\";\n    result.additionalData = {\n      mimetype: messageToProcess.imageMessage.mimetype,\n      url: messageToProcess.imageMessage.url,\n      mediaKey: messageToProcess.imageMessage.mediaKey,\n      fileLength: messageToProcess.imageMessage.fileLength,\n    };\n    return result;\n  }\n\n  // Vídeo\n  if (messageToProcess.videoMessage) {\n    result.messageType = \"video\";\n    result.content =\n      messageToProcess.videoMessage.caption || \"[Vídeo sem legenda]\";\n    result.additionalData = {\n      mimetype: messageToProcess.videoMessage.mimetype,\n      url: messageToProcess.videoMessage.url,\n      mediaKey: messageToProcess.videoMessage.mediaKey,\n      fileLength: messageToProcess.videoMessage.fileLength,\n      seconds: messageToProcess.videoMessage.seconds,\n    };\n    return result;\n  }\n\n  // Áudio\n  if (messageToProcess.audioMessage) {\n    result.messageType = \"audio\";\n    result.content = \"[Mensagem de áudio]\";\n    result.additionalData = {\n      mimetype: messageToProcess.audioMessage.mimetype,\n      url: messageToProcess.audioMessage.url,\n      mediaKey: messageToProcess.audioMessage.mediaKey,\n      fileLength: messageToProcess.audioMessage.fileLength,\n      seconds: messageToProcess.audioMessage.seconds,\n      ptt: messageToProcess.audioMessage.ptt || false, // Push to talk (áudio de voz)\n    };\n    return result;\n  }\n\n  // Documento\n  if (messageToProcess.documentMessage) {\n    result.messageType = \"document\";\n    result.content = messageToProcess.documentMessage.caption || \"[Documento]\";\n    result.additionalData = {\n      fileName: messageToProcess.documentMessage.fileName,\n      mimetype: messageToProcess.documentMessage.mimetype,\n      url: messageToProcess.documentMessage.url,\n      mediaKey: messageToProcess.documentMessage.mediaKey,\n      fileLength: messageToProcess.documentMessage.fileLength,\n      title: messageToProcess.documentMessage.title,\n    };\n    return result;\n  }\n\n  // Sticker\n  if (messageToProcess.stickerMessage) {\n    result.messageType = \"sticker\";\n    result.content = \"[Figurinha/Sticker]\";\n    result.additionalData = {\n      mimetype: messageToProcess.stickerMessage.mimetype,\n      url: messageToProcess.stickerMessage.url,\n      mediaKey: messageToProcess.stickerMessage.mediaKey,\n      isAnimated: messageToProcess.stickerMessage.isAnimated || false,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 3. MENSAGENS DE LOCALIZAÇÃO\n  // ========================================\n\n  if (messageToProcess.locationMessage) {\n    result.messageType = \"location\";\n    const lat = messageToProcess.locationMessage.degreesLatitude;\n    const lng = messageToProcess.locationMessage.degreesLongitude;\n    result.content = `Localização: ${lat}, ${lng}`;\n    result.additionalData = {\n      latitude: lat,\n      longitude: lng,\n      name: messageToProcess.locationMessage.name,\n      address: messageToProcess.locationMessage.address,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 4. MENSAGENS DE CONTATO\n  // ========================================\n\n  if (messageToProcess.contactMessage) {\n    result.messageType = \"contact\";\n    result.content = `Contato: ${messageToProcess.contactMessage.displayName}`;\n    result.additionalData = {\n      displayName: messageToProcess.contactMessage.displayName,\n      vcard: messageToProcess.contactMessage.vcard,\n    };\n    return result;\n  }\n\n  // Múltiplos contatos\n  if (messageToProcess.contactsArrayMessage) {\n    result.messageType = \"contacts\";\n    result.content = `${messageToProcess.contactsArrayMessage.contacts.length} contatos compartilhados`;\n    result.additionalData = {\n      contacts: messageToProcess.contactsArrayMessage.contacts,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 5. REAÇÕES\n  // ========================================\n\n  if (messageToProcess.reactionMessage) {\n    result.messageType = \"reaction\";\n    result.content =\n      messageToProcess.reactionMessage.text || \"[Reação removida]\";\n    result.additionalData = {\n      messageId: messageToProcess.reactionMessage.key.id,\n      emoji: messageToProcess.reactionMessage.text,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 6. ENQUETES/POLLS\n  // ========================================\n\n  if (messageToProcess.pollCreationMessage) {\n    result.messageType = \"poll\";\n    result.content = messageToProcess.pollCreationMessage.name;\n    result.additionalData = {\n      pollName: messageToProcess.pollCreationMessage.name,\n      options:\n        messageToProcess.pollCreationMessage.options?.map(\n          (opt) => opt.optionName\n        ) || [],\n      selectableOptionsCount:\n        messageToProcess.pollCreationMessage.selectableOptionsCount,\n    };\n    return result;\n  }\n\n  // Resposta a enquete\n  if (messageToProcess.pollUpdateMessage) {\n    result.messageType = \"poll_response\";\n    result.content = \"[Resposta de enquete]\";\n    result.additionalData = {\n      pollCreationMessageKey:\n        messageToProcess.pollUpdateMessage.pollCreationMessageKey,\n      vote: messageToProcess.pollUpdateMessage.vote,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 7. BOTÕES E LISTAS\n  // ========================================\n\n  // Mensagem com botões\n  if (messageToProcess.buttonsMessage) {\n    result.messageType = \"buttons\";\n    result.content =\n      messageToProcess.buttonsMessage.contentText || \"[Mensagem com botões]\";\n    result.additionalData = {\n      buttons:\n        messageToProcess.buttonsMessage.buttons?.map((btn) => ({\n          buttonId: btn.buttonId,\n          buttonText: btn.buttonText?.displayText,\n        })) || [],\n    };\n    return result;\n  }\n\n  // Resposta de botão\n  if (messageToProcess.buttonsResponseMessage) {\n    result.messageType = \"button_response\";\n    result.content =\n      messageToProcess.buttonsResponseMessage.selectedDisplayText;\n    result.additionalData = {\n      selectedButtonId:\n        messageToProcess.buttonsResponseMessage.selectedButtonId,\n    };\n    return result;\n  }\n\n  // Mensagem com lista\n  if (messageToProcess.listMessage) {\n    result.messageType = \"list\";\n    result.content =\n      messageToProcess.listMessage.description || \"[Mensagem com lista]\";\n    result.additionalData = {\n      title: messageToProcess.listMessage.title,\n      buttonText: messageToProcess.listMessage.buttonText,\n      sections: messageToProcess.listMessage.sections,\n    };\n    return result;\n  }\n\n  // Resposta de lista\n  if (messageToProcess.listResponseMessage) {\n    result.messageType = \"list_response\";\n    result.content = messageToProcess.listResponseMessage.title;\n    result.additionalData = {\n      selectedRowId:\n        messageToProcess.listResponseMessage.singleSelectReply?.selectedRowId,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 8. CHAMADAS\n  // ========================================\n\n  if (messageToProcess.callMessage) {\n    result.messageType = \"call\";\n    result.content = \"[Chamada de voz/vídeo]\";\n    result.additionalData = {\n      callKey: messageToProcess.callMessage.callKey,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 9. MENSAGENS DE SISTEMA/PROTOCOLO\n  // ========================================\n\n  if (messageToProcess.protocolMessage) {\n    result.messageType = \"protocol\";\n    const type = messageToProcess.protocolMessage.type;\n\n    switch (type) {\n      case 0: // REVOKE (mensagem apagada)\n        result.content = \"[Mensagem apagada]\";\n        result.additionalData.action = \"revoke\";\n        break;\n      default:\n        result.content = \"[Mensagem de protocolo]\";\n        result.additionalData.protocolType = type;\n    }\n    return result;\n  }\n\n  // ========================================\n  // 10. MENSAGEM DE PRODUTO/CATÁLOGO\n  // ========================================\n\n  if (messageToProcess.productMessage) {\n    result.messageType = \"product\";\n    result.content =\n      messageToProcess.productMessage.product?.title || \"[Produto]\";\n    result.additionalData = {\n      productId: messageToProcess.productMessage.product?.productId,\n      businessOwnerJid: messageToProcess.productMessage.businessOwnerJid,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 11. MENSAGEM DE TEMPLATE\n  // ========================================\n\n  if (messageToProcess.templateMessage) {\n    result.messageType = \"template\";\n    result.content = \"[Mensagem template]\";\n    result.additionalData = {\n      hydratedTemplate: messageToProcess.templateMessage.hydratedTemplate,\n    };\n    return result;\n  }\n\n  // ========================================\n  // 12. LIVE LOCATION\n  // ========================================\n\n  if (messageToProcess.liveLocationMessage) {\n    result.messageType = \"live_location\";\n    const lat = messageToProcess.liveLocationMessage.degreesLatitude;\n    const lng = messageToProcess.liveLocationMessage.degreesLongitude;\n    result.content = `Localização ao vivo: ${lat}, ${lng}`;\n    result.additionalData = {\n      latitude: lat,\n      longitude: lng,\n      accuracyInMeters: messageToProcess.liveLocationMessage.accuracyInMeters,\n      speedInMps: messageToProcess.liveLocationMessage.speedInMps,\n      degreesClockwiseFromMagneticNorth:\n        messageToProcess.liveLocationMessage.degreesClockwiseFromMagneticNorth,\n    };\n    return result;\n  }\n\n  // ========================================\n  // TIPO DESCONHECIDO\n  // ========================================\n\n  result.messageType = \"unknown\";\n  result.content = \"[Tipo de mensagem não identificado]\";\n  result.additionalData.messageKeys = Object.keys(messageToProcess);\n\n  return result;\n}\n\n// ========================================\n// PROCESSAR TODOS OS ITENS\n// ========================================\n\ntry {\n  const items = $input.all();\n  const processedItems = [];\n\n  for (const item of items) {\n    const processed = processMessage(item.json);\n\n    // Mesclar resultado processado com item original\n    processedItems.push({\n      json: {\n        ...item.json,\n        processed: processed,\n      },\n    });\n  }\n\n  return processedItems;\n} catch (error) {\n  // Em caso de erro, retornar informação útil\n  return [\n    {\n      json: {\n        error: true,\n        errorMessage: error.message,\n        errorStack: error.stack,\n        originalData: $input.all()[0]?.json,\n      },\n    },\n  ];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        -1680
+      ],
+      "id": "2481d347-2d7f-4bc6-ae46-b0a740f2717a",
+      "name": "ParseWebhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('GetCustomerByCompany').first().json.isEmpty() }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "5301f74f-cd89-42b0-b34a-8e6d7aeeaf22"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9aaa3451-1411-49c7-875a-de9a5b26029f",
+                    "leftValue": "={{ $('GetCustomerByCompany').first().json.isEmpty() }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -784,
+        -800
+      ],
+      "id": "ec8d9cff-a196-4326-b446-ce10775feaaa",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            },
+            {
+              "keyName": "company_id",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        -800
+      ],
+      "id": "b82eb6a5-7c05-4acd-a35e-eddab3341c8a",
+      "name": "GetCustomerByCompany",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -784
+      ],
+      "id": "a5e7d59c-f818-48b7-8ebd-b299c36d378c",
+      "name": "Customer"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1c7c7301-0d15-4bda-8ab9-2aff08094cd6",
+              "leftValue": "={{ $('Customer').item.json.data[0].email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b633f871-1a2a-4e9c-b9d3-795d828a530f",
+              "leftValue": "={{ $('Customer').item.json.data[0].birthdate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        -32
+      ],
+      "id": "234d3690-895b-4833-bb17-0fcd558cdfe0",
+      "name": "AlreadyOnBoard"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Cria agendamento. Requer: service_id, colaborator_id, location_id, event_date (YYYY-MM-DD HH:MM:SS), title, description.",
+        "tableId": "events",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'Data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS.') }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $fromAI(\"event_title\", \"[NOME DO CLIENTE] - [SERVIÇO]\") }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI(\"event_description\", \"A partir do histórico da conversa, crie um resumo interno para o profissional que vai atender: histórico relevante do cliente, objetivo do atendimento, preferências, restrições e alertas importantes, em até 4 frases curtas. Em seguida, escreva de 3 a 5 orientações práticas em para guiar o atendimento com tom objetivo, sem promessas, sem emojis e sem mencionar IDs, sistema ou IA. APENAS TEXTO PURO.\") }}"
+            },
+            {
+              "fieldId": "company_id",
+              "fieldValue": "={{ $('GetCompany').item.json.id }}"
+            },
+            {
+              "fieldId": "colaborator_id",
+              "fieldValue": "={{ $fromAI('colaborator_id', 'ID do colaborador') }}"
+            },
+            {
+              "fieldId": "service_id",
+              "fieldValue": "={{ $fromAI('service_id', 'ID do serviço') }}"
+            },
+            {
+              "fieldId": "location_id",
+              "fieldValue": "={{ $fromAI('location_id', 'ID da unidade') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2416,
+        272
+      ],
+      "id": "dae45e19-4691-4603-b1b8-0f75a9178f45",
+      "name": "create_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Atualiza agendamento existente. Requer: event_id, event_date, title, description.",
+        "operation": "update",
+        "tableId": "events",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $fromAI(\"event_id\", \"ID do evento que deve ser atualizado\") }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $fromAI(\"event_title\", \"[NOME DO CLIENTE] - [SERVIÇO] (REMARCADO)\") }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $fromAI(\"event_description\", \"A partir do histórico da conversa, crie um resumo interno para o profissional que vai atender: histórico relevante do cliente, objetivo do atendimento, preferências, restrições e alertas importantes, em até 4 frases curtas. Em seguida, escreva de 3 a 5 orientações práticas em para guiar o atendimento com tom objetivo, sem promessas, sem emojis e sem mencionar IDs, sistema ou IA. APENAS TEXTO PURO.\") }}"
+            },
+            {
+              "fieldId": "event_date",
+              "fieldValue": "={{ $fromAI('event_date', 'Data e hora do evento padrão datetime ex: YYYY-MM-DD HH:MM:SS.') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        272
+      ],
+      "id": "1f8b757f-aa2c-4e87-ad7c-1afccaa46c21",
+      "name": "update_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Cancela agendamento. Requer: event_id.",
+        "operation": "delete",
+        "tableId": "events",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $fromAi('event_id', 'id do evento') }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2736,
+        272
+      ],
+      "id": "1728a7b2-ca7e-436d-a72b-f23f283ff364",
+      "name": "remove_event",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna servicos disponiveis. Campos: id, name, price, description.",
+        "operation": "getAll",
+        "tableId": "v_services_minimal",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3056,
+        272
+      ],
+      "id": "d3b358c2-91b8-4313-b858-5f4e687520ff",
+      "name": "get_services_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna profissionais. Campos: id, name, role.",
+        "operation": "getAll",
+        "tableId": "v_colaborators_minimal",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3216,
+        272
+      ],
+      "id": "e57681bb-76b8-4d4d-bd72-6f71b8d62cb6",
+      "name": "get_colaborators_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna unidades. Campos: id, name, address.",
+        "operation": "getAll",
+        "tableId": "v_locations_minimal",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3376,
+        272
+      ],
+      "id": "209c60f7-52e0-423b-b1fb-8dc7341342bc",
+      "name": "get_locations_by_company_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna combinacoes validas de servico + profissional + unidade. Use para validar antes de agendar.",
+        "operation": "getAll",
+        "tableId": "v_relationships_minimal",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        272
+      ],
+      "id": "8be026b0-6fec-4351-9388-4d4faf25caa6",
+      "name": "get_relationships",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1936,
+        -256
+      ],
+      "id": "8c00025d-e1a9-4b0c-9ada-b43c98a656bf",
+      "name": "RecepcionistMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1936,
+        272
+      ],
+      "id": "2f61c135-eeb0-4ecb-b36f-abf0df100cb9",
+      "name": "SalespersonMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retorna agendamentos do cliente. Campos: id, event_date, service_id, colaborator_id, location_id.",
+        "operation": "getAll",
+        "tableId": "v_events_minimal",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "keyName": "company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('GetCompany').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        272
+      ],
+      "id": "bd89ebba-671a-463e-8654-8559eb342316",
+      "name": "get_events",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Verifica se profissional esta livre no horario. Retorna array vazio = disponivel, com registros = ocupado.",
+        "method": "POST",
+        "url": "https://zccvoklldxbbacjkirkh.supabase.co/rest/v1/rpc/check_availability_by_colaborator",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjY3Zva2xsZHhiYmFjamtpcmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxNTM1NDUsImV4cCI6MjA3MTcyOTU0NX0.WaeNMbzz1Mor0ogNA6pcNkJzTHPBfZOxcAbolCzoOSk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n \"p_company_id\": \"{{ $('GetCompany').item.json.id }}\",\n \"p_colaborator_id\": \"{{ $fromAI(\"colaborator_id\", \"ID do colaborador.\") }}\",\n \"p_event_date\": \"{{ $fromAI(\"event_date\", \"data e hora do evento incluindo timezone ex: 2025-11-23 17:00:00 → 2025-11-23T17:00:00+00:00.\") }}\",\n \"p_location_id\": \"{{ $fromAI(\"location_id\", \"ID da unidade\") }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        2896,
+        272
+      ],
+      "id": "058e45d2-fc61-4c23-9ae4-9a828ea779ff",
+      "name": "check_availability_by_colaborator"
+    },
+    {
+      "parameters": {
+        "resource": "profile-api",
+        "instanceName": "={{ $('ParseWebhook').item.json.processed.metadata.instance }}",
+        "remoteJid": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        -208
+      ],
+      "id": "33ede249-6ed7-425a-a30c-744ac127cec9",
+      "name": "GetCustomerWhatsappProfile",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "customers",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "picture",
+              "fieldValue": "={{ $json.data.picture }}"
+            },
+            {
+              "fieldId": "isBusiness",
+              "fieldValue": "={{ $json.data.isBusiness }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3872,
+        -208
+      ],
+      "id": "1fc81b2c-bec5-4ea6-bfa7-445eab7bb012",
+      "name": "UpdateCustomerProfile",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat-api",
+        "operation": "get-media-base64",
+        "instanceName": "={{ $('ParseWebhook').item.json.body.instance }}",
+        "messageId": "={{ $('ParseWebhook').item.json.body.data.key.id }}"
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        -448
+      ],
+      "id": "b4f7d0c0-dfae-4e50-b0d1-a282f6671cb8",
+      "name": "GetBase64",
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data.base64",
+        "options": {
+          "fileName": "file.ogg",
+          "mimeType": "={{ $json.data.mimetype }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -976,
+        -448
+      ],
+      "id": "c13d41cb-97e3-422a-a277-04b12d865286",
+      "name": "Base64ToAudio"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        -448
+      ],
+      "id": "1dd6b539-cf15-4880-ab8e-bdca7789d7ec",
+      "name": "TranscribeAudio",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "zKjSA8dTYm3IzjGB",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        -544
+      ],
+      "id": "5b504335-7632-4e81-b9a4-745be6216831",
+      "name": "Wait",
+      "webhookId": "25aec42d-e8b0-4f66-8580-76de12119f5d"
+    },
+    {
+      "parameters": {
+        "tableId": "message_buffer",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ \n$('TranscribeAudio').isExecuted ? $('TranscribeAudio').item.json.text : \n$('ParseWebhook').isExecuted ? $('ParseWebhook').item.json.processed.content : '' \n}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -544
+      ],
+      "id": "53681565-33f5-4fda-b1f5-84c23f6c7c84",
+      "name": "CreateMessageBuffer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "455b46e9-44f6-4888-a235-92e00ffd3cb4",
+              "leftValue": "={{ $('GetMessageBuffer').last().json.message }}",
+              "rightValue": "={{ \n$('TranscribeAudio').isExecuted ? $('TranscribeAudio').item.json.text : \n$('ParseWebhook').isExecuted ? $('ParseWebhook').item.json.processed.content : '' \n}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        -544
+      ],
+      "id": "fae59e0c-4414-4393-a260-4cfb98ec901f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "message_buffer",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -560
+      ],
+      "id": "91298bfc-c09d-49a9-b5a4-ae61752c40ed",
+      "name": "CleanMessageBuffer",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "message_buffer",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        64,
+        -544
+      ],
+      "id": "01691b42-eadf-4d7b-83d8-2f7c6fb231d6",
+      "name": "GetMessageBuffer",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a2801742-e86b-4179-8330-e320590c5f39",
+              "name": "finalmessage",
+              "value": "={{ $('GetMessageBuffer').all().map(item => item.json.message).join(' ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        -560
+      ],
+      "id": "1cdeccff-749e-416b-b08d-136023377095",
+      "name": "MessagesGroup",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "message_blocker",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -32
+      ],
+      "id": "b2be447f-b577-406b-9b00-044b7eef3eff",
+      "name": "CreateMessageBlocker",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "message_blocker",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -560
+      ],
+      "id": "10eca5f7-8391-49c4-a4af-7c754723f1cf",
+      "name": "GetMessageBlocker",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3d873717-2af3-4da6-bc1a-d6ae2443d1ab",
+              "leftValue": "={{ $('GetMessageBlocker').first().json.isEmpty() }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        -288
+      ],
+      "id": "07f2bfb3-a961-415f-b872-f02ecd7e9461",
+      "name": "CheckBlocked"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('MessagesGroup').first().json.finalmessage }}",
+        "options": {
+          "systemMessage": "=# CONTEXTO\n\nVoce e Lilly, recepcionista da {{ $('GetCompany').item.json.name }}.\nSobre a empresa: {{ $('GetCompany').item.json.about }}\nData atual: {{ $now }}\n\nEste prompt e acionado quando outro agente esta processando uma solicitacao que demora. Sua funcao e manter o cliente informado enquanto aguarda.\n\n---\n\n# REGRAS CRITICAS\n\n1. **Silencio obrigatorio**: Chame `CheckMessageBlocker` primeiro. Se retornar array vazio `[]`, PARE. Nao gere nenhum texto. Resposta vazia.\n2. **Saida limpa**: Responda APENAS a mensagem final ao cliente. Nunca exponha raciocinio interno, resultados de tools, IDs, UUIDs, timestamps ou texto tecnico.\n\n---\n\n# ESTILO\n\n- Tom cordial, breve e direto\n- Demonstre que algo esta sendo feito ativamente\n- Nunca diga que e IA/robo/assistente virtual\n- Nunca use emojis\n\n---\n\n# EXEMPLOS DE RESPOSTA\n\nAdapte ao contexto da conversa:\n\n- **Agendamento:** \"Estou verificando a disponibilidade, so mais um momento...\"\n- **Cancelamento:** \"Estou processando o cancelamento, ja ja te retorno...\"\n- **Consulta:** \"Estou buscando essas informacoes, um momentinho...\"\n- **Remarcacao:** \"Estou verificando as opcoes para remarcar, aguarde um instante...\"\n- **Generico:** \"Um momento por favor, ja estou finalizando...\"\n\n---\n\n# METADADOS (NUNCA MOSTRAR AO CLIENTE)\n\n[METADATA: EXECUTION_ID={{ $executionId }}]\n[METADATA: COMPANY_ID={{ $('GetCompany').item.json.id }}]\n[METADATA: CUSTOMER_ID={{ $('Customer').item.json.data[0].id }}]\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1776,
+        -960
+      ],
+      "id": "f1cb891c-28ae-4dc8-a087-73357eecc3b4",
+      "name": "WaitPlease",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-5-mini",
+        "options": {
+          "frequencyPenalty": 0,
+          "maxTokens": -1,
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        -720
+      ],
+      "id": "ad771d28-9c5f-4769-8238-a62b59b0eed7",
+      "name": "LLM-3",
+      "credentials": {
+        "openRouterApi": {
+          "id": "b7AMm4y8Tb9x1H6j",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "message_blocker",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2704,
+        -240
+      ],
+      "id": "aef4495a-76b7-41f4-9a8d-8cb40ffba03c",
+      "name": "DeleteMessageBlocker",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Customer').item.json.data[0].id }}",
+        "contextWindowLength": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        -720
+      ],
+      "id": "f96a831c-2b63-4c32-bc5e-bce703fd43be",
+      "name": "WaitPleaseMemory",
+      "credentials": {
+        "postgres": {
+          "id": "wjGOlo4GV72ZCuQS",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Verifica se outro agente esta processando. Array vazio = nao responda, com registro = gere mensagem de aguardo.",
+        "operation": "get",
+        "tableId": "message_blocker",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "customer_id",
+              "keyValue": "={{ $('Customer').item.json.data[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        -720
+      ],
+      "id": "0ef823c7-99d2-47a5-9032-01e65e2e7af3",
+      "name": "CheckMessageBlocker",
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0e2cf41d-d2d6-4147-a5eb-363a4a09c9c7",
+              "leftValue": "={{ $('ParseWebhook').item.json.processed.metadata.fromMe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -784,
+        -1344
+      ],
+      "id": "d2216bdd-8dcc-47e0-b2fb-a300f5f724f8",
+      "name": "FromMe"
+    },
+    {
+      "parameters": {
+        "tableId": "human_in_the_loop",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "remote_jid",
+              "fieldValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -1440
+      ],
+      "id": "19e66c62-7a4d-45f9-a7fa-95614a813304",
+      "name": "CreateHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "condition": "eq",
+              "keyValue": "="
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -1440
+      ],
+      "id": "cb4a9234-a3c1-431c-b176-e672d5960963",
+      "name": "DeleteOldestHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -1248
+      ],
+      "id": "f54b069c-ad51-4798-a5ca-38e99896398a",
+      "name": "GetHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recebe os dados do node anterior\nconst items = $(\"GetHumanInTheLoop\").all()\n\n// Verifica se existe registro\nif (!items || items.length === 0 || !items[0].json) {\n  return [{ json: { result: false, description: \"aqui 2\" } }];\n}\n\nconst record = items[0].json;\n\n// Verifica se existe created_at\nif (!record.created_at) {\n  return [{ json: { result: false, description:\"aqui 3\" } }];\n}\n\nconst createdAt = new Date(record.created_at);\nconst now = new Date();\n\nconst diffMinutes = (now - createdAt) / (1000 * 60);\n\n// Retorna true se created_at for inferior a 10 minutos\nconst result = diffMinutes < 10;\n\nreturn [{ json: { \n  \"created_at\": createdAt + \"---\",\n  \"now\": now,\n  \"diffMinutes\": diffMinutes,\n  \"result\": result } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        -1248
+      ],
+      "id": "1cc79fc1-bb1b-49e1-8800-2248de692116",
+      "name": "CheckHumanInTheLoop",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "human_in_the_loop",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "remote_jid",
+              "condition": "eq",
+              "keyValue": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -1232
+      ],
+      "id": "3e77cb19-2ece-44fc-8ca0-7d7b0f3f5699",
+      "name": "DeleteOldestHumanInTheLoop1",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "o9u8cYOj8EpbWDWu",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "be080639-5169-4004-a015-4a763e704108",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        -1248
+      ],
+      "id": "a5a889a5-28b6-49e9-a2f9-af3fbe0b014a",
+      "name": "HasHumanInTheLoop"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "co3iAE7dgJNCnyDm",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/co3iAE7dgJNCnyDm",
+          "cachedResultName": "SendTyping"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "remoteJid": "={{ $('ParseWebhook').item.json.body.data.key.remoteJid }}",
+            "instanceId": "={{ $('ParseWebhook').item.json.processed.metadata.instance }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "instanceId",
+              "displayName": "instanceId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "remoteJid",
+              "displayName": "remoteJid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "delay",
+              "displayName": "delay",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -144,
+        -544
+      ],
+      "id": "a18e8d15-ebe0-4fd5-b5da-2e5dfac8de49",
+      "name": "SendTyping"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "co3iAE7dgJNCnyDm",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/co3iAE7dgJNCnyDm",
+          "cachedResultName": "SendTyping"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "remoteJid": "={{ $('ParseWebhook').item.json.body.data.key.remoteJid }}",
+            "instanceId": "={{ $('ParseWebhook').item.json.processed.metadata.instance }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "instanceId",
+              "displayName": "instanceId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "remoteJid",
+              "displayName": "remoteJid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "delay",
+              "displayName": "delay",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        -288
+      ],
+      "id": "22e65869-70e9-4622-80a7-02179bd3a85f",
+      "name": "SendTyping1"
+    },
+    {
+      "parameters": {
+        "description": "Use esta ferramenta para avisar o usuário que você ainda está processando/pensando.",
+        "workflowId": {
+          "__rl": true,
+          "value": "co3iAE7dgJNCnyDm",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/co3iAE7dgJNCnyDm",
+          "cachedResultName": "SendTyping"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "instanceId": "={{ $('ParseWebhook').item.json.processed.metadata.instance }}",
+            "remoteJid": "={{ $('ParseWebhook').item.json.processed.metadata.remoteJid }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "instanceId",
+              "displayName": "instanceId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "remoteJid",
+              "displayName": "remoteJid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2096,
+        272
+      ],
+      "id": "d3d0da03-93ec-4ea1-a49c-60de2033b56c",
+      "name": "send_typing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Salesperson": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DeleteMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recepcionist": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DeleteMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomer": {
+      "ai_tool": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateCustomer": {
+      "ai_tool": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendMessage": {
+      "main": [
+        [
+          {
+            "node": "GetCustomerWhatsappProfile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "ParseWebhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateCustomer": {
+      "main": [
+        [
+          {
+            "node": "Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SwitchByMessageType": {
+      "main": [
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetBase64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCompany": {
+      "main": [
+        [
+          {
+            "node": "CheckTokenBalance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseWebhook": {
+      "main": [
+        [
+          {
+            "node": "GetCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckTokenBalance": {
+      "main": [
+        [
+          {
+            "node": "GetCustomerByCompany",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "CreateCustomer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomerByCompany": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer": {
+      "main": [
+        [
+          {
+            "node": "SwitchByMessageType",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AlreadyOnBoard": {
+      "main": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salesperson",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "remove_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_services_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_colaborators_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_locations_by_company_id": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_relationships": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RecepcionistMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Recepcionist",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SalespersonMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability_by_colaborator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetCustomerWhatsappProfile": {
+      "main": [
+        [
+          {
+            "node": "UpdateCustomerProfile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetBase64": {
+      "main": [
+        [
+          {
+            "node": "Base64ToAudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64ToAudio": {
+      "main": [
+        [
+          {
+            "node": "TranscribeAudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TranscribeAudio": {
+      "main": [
+        [
+          {
+            "node": "CreateMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "SendTyping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "CleanMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "GetMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CleanMessageBuffer": {
+      "main": [
+        [
+          {
+            "node": "MessagesGroup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MessagesGroup": {
+      "main": [
+        [
+          {
+            "node": "GetMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CreateMessageBlocker": {
+      "main": [
+        [
+          {
+            "node": "AlreadyOnBoard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetMessageBlocker": {
+      "main": [
+        [
+          {
+            "node": "SendTyping1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckBlocked": {
+      "main": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CreateMessageBlocker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM-3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WaitPlease": {
+      "main": [
+        [
+          {
+            "node": "SendMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteMessageBlocker": {
+      "main": [
+        []
+      ]
+    },
+    "WaitPleaseMemory": {
+      "ai_memory": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckMessageBlocker": {
+      "ai_tool": [
+        [
+          {
+            "node": "WaitPlease",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FromMe": {
+      "main": [
+        [
+          {
+            "node": "DeleteOldestHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GetHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteOldestHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "CreateHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "CheckHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckHumanInTheLoop": {
+      "main": [
+        [
+          {
+            "node": "HasHumanInTheLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HasHumanInTheLoop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "DeleteOldestHumanInTheLoop1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteOldestHumanInTheLoop1": {
+      "main": [
+        []
+      ]
+    },
+    "SendTyping": {
+      "main": [
+        [
+          {
+            "node": "GetMessageBuffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendTyping1": {
+      "main": [
+        [
+          {
+            "node": "CheckBlocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_typing": {
+      "ai_tool": [
+        [
+          {
+            "node": "Salesperson",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Etc/UTC",
+    "availableInMCP": false
+  },
+  "versionId": "bbd597b6-76fd-4ae6-8c2f-894e96366a93",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7817a412ad83ff0e79b10827c3866bd995411ae8fd1908af0ca05bc1bbb34d24"
+  },
+  "id": "y8yDSBTrWgh2CsnK",
+  "tags": []
+}

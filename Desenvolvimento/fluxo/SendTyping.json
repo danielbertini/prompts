@@ -1,0 +1,90 @@
+{
+  "name": "SendTyping",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "chat-api",
+        "operation": "send-presence",
+        "instanceName": "={{ $('Trigger').item.json.instanceId }}",
+        "remoteJid": "={{ $('Trigger').item.json.remoteJid }}",
+        "delay": 1500
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -48
+      ],
+      "id": "9c233b9b-6118-40e1-bff2-74da776010b4",
+      "name": "SendPresence",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "evolutionApi": {
+          "id": "aOWw8W5NC36bTryb",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "instanceId"
+            },
+            {
+              "name": "remoteJid"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -640,
+        -48
+      ],
+      "id": "f6fd3f31-1ae4-442d-b582-224486242385",
+      "name": "Trigger",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SendPresence": {
+      "main": [
+        []
+      ]
+    },
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "SendPresence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Etc/UTC",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false
+  },
+  "versionId": "409234ee-85e8-4b73-900d-a04efee12bbc",
+  "meta": {
+    "instanceId": "7817a412ad83ff0e79b10827c3866bd995411ae8fd1908af0ca05bc1bbb34d24"
+  },
+  "id": "co3iAE7dgJNCnyDm",
+  "tags": []
+}
