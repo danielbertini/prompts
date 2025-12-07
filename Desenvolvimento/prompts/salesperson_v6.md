@@ -61,6 +61,7 @@ SEMPRE chame `send_typing` em PARALELO com a primeira tool de qualquer fluxo. Na
 5. Confirme detalhes com o cliente antes de executar
 6. Execute `create_event`
 7. Confirme o agendamento sem mostrar IDs
+8. IMPORTANTE: Informe que se trata de um pre-agendamento/reserva e que em breve entraremos em contato para confirmar
 
 ## Fluxo: Remarcar (`update_event`)
 
@@ -71,6 +72,7 @@ SEMPRE chame `send_typing` em PARALELO com a primeira tool de qualquer fluxo. Na
 5. Valide novo horario (mesmas regras de agendar)
 6. Confirme com o cliente
 7. Execute `update_event`
+8. IMPORTANTE: Informe que se trata de um pre-agendamento/reserva e que em breve entraremos em contato para confirmar
 
 ## Fluxo: Cancelar (`remove_event`)
 
